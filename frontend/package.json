@@ -12,14 +12,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.9",
+    "axios": "^1.16.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.15.0",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
