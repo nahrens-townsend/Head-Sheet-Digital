@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="HeadSheet.Api/HeadSheet.Api.csproj" />
+  <Project Path="HeadSheet.Application/HeadSheet.Application.csproj" />
+  <Project Path="HeadSheet.Domain/HeadSheet.Domain.csproj" />
+  <Project Path="HeadSheet.Infrastructure/HeadSheet.Infrastructure.csproj" />
+  <Project Path="HeadSheet.Tests/HeadSheet.Tests.csproj" />
+</Solution>
