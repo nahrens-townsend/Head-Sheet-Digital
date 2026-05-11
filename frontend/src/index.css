@@ -603,6 +603,7 @@ code {
 .head-sheet-canvas--tool-pen    { cursor: crosshair; }
 .head-sheet-canvas--tool-line   { cursor: crosshair; }
 .head-sheet-canvas--tool-eraser { cursor: cell; }
+.head-sheet-canvas--tool-hand   { cursor: grab; }
 
 /* ── Selection panel (floating property bar) ────────────────── */
 

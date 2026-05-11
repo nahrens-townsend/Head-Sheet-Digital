@@ -58,6 +58,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   zoomRef.current = zoom;
   const panOffsetRef = useRef(panOffset);
   panOffsetRef.current = panOffset;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
 
   // Set to true while a two-finger pinch is active so Stage drawing is suppressed.
   const isPinchingRef = useRef(false);
@@ -154,7 +156,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const onPointerDown = (e: PointerEvent) => {
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      if (e.button === 1 && e.pointerType === 'mouse') {
+      const isHandToolPan = e.button === 0 && e.pointerType === 'mouse' && toolRef.current === 'hand';
+      if ((e.button === 1 && e.pointerType === 'mouse') || isHandToolPan) {
         isPanning = true;
         panStart = { x: e.clientX, y: e.clientY };
         panOffsetAtStart = { ...panOffsetRef.current };
@@ -226,7 +229,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
       if (isPanning) {
         isPanning = false;
-        el.style.cursor = '';
+        el.style.cursor = toolRef.current === 'hand' ? 'grab' : '';
         e.stopPropagation();
         return;
       }
@@ -366,6 +369,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         return dottedTool;
       case 'eraser':
         return eraserTool;
+      case 'hand':
+        return selectTool; // hand uses native pan; Stage handlers receive no meaningful events
       case 'pen':
       default:
         return penTool;
