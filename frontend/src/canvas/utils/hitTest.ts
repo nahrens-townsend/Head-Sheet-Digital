@@ -36,7 +36,7 @@ export function hitTestCanvasObject(
     return false
   }
 
-  if (obj.type === 'line') {
+  if (obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted') {
     const s = denormalizePoint(obj.start, stageSize)
     const m = denormalizePoint(obj.mid, stageSize)
     const e = denormalizePoint(obj.end, stageSize)

@@ -22,13 +22,18 @@ export interface EraserStrokeObject extends BaseCanvasObject {
 }
 
 export interface LineObject extends BaseCanvasObject {
-  type: 'line'
+  type: 'line' | 'arrow' | 'dotted'
   start: { x: number; y: number }
   mid: { x: number; y: number }
   end: { x: number; y: number }
 }
 
 export type CanvasObject = PenStrokeObject | EraserStrokeObject | LineObject
+
+/** Narrows any CanvasObject to the LineObject family (line / arrow / dotted). */
+export function isLineObject(obj: CanvasObject): obj is LineObject {
+  return obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted'
+}
 
 export interface CanvasData {
   version: 2

@@ -13,6 +13,8 @@ function duplicateObject(obj: CanvasObject): CanvasObject {
 
   switch (obj.type) {
     case 'line':
+    case 'arrow':
+    case 'dotted':
       return {
         ...obj,
         id,

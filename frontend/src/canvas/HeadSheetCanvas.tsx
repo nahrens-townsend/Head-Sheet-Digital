@@ -6,8 +6,11 @@ import type { TemplateType } from '../types/headSheet';
 import type { CanvasObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
+import { useArrowLineTool } from './tools/useArrowLineTool';
+import { useDottedLineTool } from './tools/useDottedLineTool';
 import { usePenTool } from './tools/usePenTool';
 import { useSelectTool } from './tools/useSelectTool';
+import { useSnapping } from './utils/snapping';
 import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ObjectsLayer } from './layers/ObjectsLayer';
@@ -109,6 +112,10 @@ export function HeadSheetCanvas({
 
   const strokePixelWidth = STROKE_SIZES[strokeSize];
 
+  const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize);
+
+  const commonVectorOpts = { stageRef, stageSize, color, strokeSize, onObjectComplete, snap, clearSnap };
+
   const penTool = usePenTool({
     stageRef,
     liveLineRef,
@@ -118,13 +125,9 @@ export function HeadSheetCanvas({
     onObjectComplete,
   });
 
-  const lineTool = useLineTool({
-    stageRef,
-    stageSize,
-    color,
-    strokeSize,
-    onObjectComplete,
-  });
+  const lineTool = useLineTool(commonVectorOpts);
+  const arrowTool = useArrowLineTool(commonVectorOpts);
+  const dottedTool = useDottedLineTool(commonVectorOpts);
 
   const eraserTool = useEraserTool({
     stageRef,
@@ -145,13 +148,23 @@ export function HeadSheetCanvas({
         return selectTool;
       case 'line':
         return lineTool;
+      case 'arrow':
+        return arrowTool;
+      case 'dotted':
+        return dottedTool;
       case 'eraser':
         return eraserTool;
       case 'pen':
       default:
         return penTool;
     }
-  }, [eraserTool, lineTool, penTool, selectTool, tool]);
+  }, [arrowTool, dottedTool, eraserTool, lineTool, penTool, selectTool, tool]);
+
+  const activePreviewPoints =
+    tool === 'line' ? lineTool.previewPoints :
+    tool === 'arrow' ? arrowTool.previewPoints :
+    tool === 'dotted' ? dottedTool.previewPoints :
+    null;
 
   return (
     <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool}`}>
@@ -175,16 +188,15 @@ export function HeadSheetCanvas({
           tool={tool}
           color={color}
           strokePixelWidth={strokePixelWidth}
-          previewPoints={lineTool.previewPoints}
+          previewPoints={activePreviewPoints}
         />
-        {tool === 'select' && (
-          <SelectionLayer
-            objects={objects}
-            selectedObjectIds={selectedObjectIds}
-            stageSize={stageSize}
-            onUpdateObject={onUpdateObject}
-          />
-        )}
+        <SelectionLayer
+          objects={objects}
+          selectedObjectIds={tool === 'select' ? selectedObjectIds : []}
+          stageSize={stageSize}
+          onUpdateObject={onUpdateObject}
+          snapIndicator={snapIndicator}
+        />
       </Stage>
     </div>
   );

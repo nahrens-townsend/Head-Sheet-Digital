@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Circle, Group, Layer, Line } from 'react-konva'
 import type { CanvasObject } from '../../types/canvasObject'
+import { isLineObject } from '../../types/canvasObject'
 import {
   denormalizePoint,
   denormalizePoints,
@@ -14,12 +15,14 @@ const HANDLE_RADIUS = 7
 const HANDLE_FILL = '#ffffff'
 const HANDLE_STROKE = '#aa3bff'
 const SELECTION_HIGHLIGHT = '#aa3bff'
+const SNAP_COLOR = '#aa3bff'
 
 interface SelectionLayerProps {
   objects: CanvasObject[]
   selectedObjectIds: string[]
   stageSize: StageSize
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
+  snapIndicator?: Point | null
 }
 
 function ControlHandle({
@@ -50,6 +53,7 @@ export function SelectionLayer({
   selectedObjectIds,
   stageSize,
   onUpdateObject,
+  snapIndicator = null,
 }: SelectionLayerProps) {
   // Ref so drag callbacks always see the latest stageSize even after a window resize
   const stageSizeRef = useRef(stageSize)
@@ -80,7 +84,7 @@ export function SelectionLayer({
           )
         }
 
-        if (obj.type === 'line') {
+        if (isLineObject(obj)) {
           const start = denormalizePoint(obj.start, stageSize)
           const mid = denormalizePoint(obj.mid, stageSize)
           const end = denormalizePoint(obj.end, stageSize)
@@ -101,7 +105,7 @@ export function SelectionLayer({
                 y={start.y}
                 onDragEnd={(p) =>
                   onUpdateObject(obj.id, (o) =>
-                    o.type === 'line'
+                    isLineObject(o)
                       ? { ...o, start: normalizePoint(p, stageSizeRef.current) }
                       : o,
                   )
@@ -112,7 +116,7 @@ export function SelectionLayer({
                 y={mid.y}
                 onDragEnd={(p) =>
                   onUpdateObject(obj.id, (o) =>
-                    o.type === 'line'
+                    isLineObject(o)
                       ? { ...o, mid: normalizePoint(p, stageSizeRef.current) }
                       : o,
                   )
@@ -123,7 +127,7 @@ export function SelectionLayer({
                 y={end.y}
                 onDragEnd={(p) =>
                   onUpdateObject(obj.id, (o) =>
-                    o.type === 'line'
+                    isLineObject(o)
                       ? { ...o, end: normalizePoint(p, stageSizeRef.current) }
                       : o,
                   )
@@ -135,6 +139,19 @@ export function SelectionLayer({
 
         return null
       })}
+
+      {/* Snap indicator — shown while drawing a vector line near an endpoint */}
+      {snapIndicator && (
+        <Circle
+          x={snapIndicator.x}
+          y={snapIndicator.y}
+          radius={9}
+          stroke={SNAP_COLOR}
+          strokeWidth={2}
+          fill="transparent"
+          listening={false}
+        />
+      )}
     </Layer>
   )
 }
