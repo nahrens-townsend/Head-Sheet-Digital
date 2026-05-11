@@ -347,7 +347,7 @@ export function HeadSheetCanvas({
           templateImage={templateImage}
           templateRect={templateRect}
         />
-        <ObjectsLayer objects={objects} stageSize={stageSize} />
+        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} />
         <LiveLayer
           liveLineRef={liveLineRef}
           tool={tool}
