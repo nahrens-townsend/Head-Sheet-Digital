@@ -111,6 +111,22 @@ function recomputeMid(
   }
 }
 
+/** Point on the quadratic Bézier at t=0.5, given start, control, and end. */
+function onCurveAtHalf(start: Point, ctrl: Point, end: Point): Point {
+  return {
+    x: 0.25 * start.x + 0.5 * ctrl.x + 0.25 * end.x,
+    y: 0.25 * start.y + 0.5 * ctrl.y + 0.25 * end.y,
+  }
+}
+
+/** Inverse: given the desired on-curve point q at t=0.5, derive the bezier ctrl. */
+function ctrlFromOnCurve(q: Point, start: Point, end: Point): Point {
+  return {
+    x: 2 * q.x - 0.5 * (start.x + end.x),
+    y: 2 * q.y - 0.5 * (start.y + end.y),
+  }
+}
+
 // ── ControlHandle ─────────────────────────────────────────────────────────────
 
 function ControlHandle({
@@ -388,16 +404,6 @@ export function SelectionLayer({
                 }}
               />
 
-              {/* Dashed guide lines — update live during any drag */}
-              <Line
-                points={[dStart.x, dStart.y, dMid.x, dMid.y, dEnd.x, dEnd.y]}
-                stroke={SELECTION_HIGHLIGHT}
-                strokeWidth={1}
-                opacity={0.5}
-                dash={[4, 4]}
-                listening={false}
-              />
-
               {/* Live bezier overlay — only rendered during an active drag */}
               {draftLine && (
                 <Shape
@@ -439,17 +445,19 @@ export function SelectionLayer({
                 }}
               />
               <ControlHandle
-                x={cMid.x}
-                y={cMid.y}
+                x={onCurveAtHalf(dStart, dMid, dEnd).x}
+                y={onCurveAtHalf(dStart, dMid, dEnd).y}
                 radius={handleRadius}
                 zoom={zoom}
                 onDragMove={(p) => {
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: p, end: cEnd })
+                  const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: ctrl, end: cEnd })
                 }}
                 onDragEnd={(p) => {
+                  const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(p, stageSizeRef.current) }
+                      ? { ...o, mid: normalizePoint(ctrl, stageSizeRef.current) }
                       : o,
                   )
                   setDraftState(null)
