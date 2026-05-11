@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
-import { Circle, Group, Layer, Line } from 'react-konva'
+import { useState, useEffect, useRef } from 'react'
+import { Circle, Group, Layer, Line, Shape } from 'react-konva'
 import type { CanvasObject } from '../../types/canvasObject'
 import { isLineObject } from '../../types/canvasObject'
+import type { SnapFn } from '../utils/snapping'
 import {
   denormalizePoint,
   denormalizePoints,
   normalizePoint,
+  normalizePoints,
   STROKE_SIZES,
   type Point,
   type StageSize,
@@ -16,28 +18,114 @@ const HANDLE_FILL = '#ffffff'
 const HANDLE_STROKE = '#aa3bff'
 const SELECTION_HIGHLIGHT = '#aa3bff'
 const SNAP_COLOR = '#aa3bff'
+const BODY_HIT_WIDTH = 22
 
-interface SelectionLayerProps {
-  objects: CanvasObject[]
-  selectedObjectIds: string[]
-  stageSize: StageSize
-  zoom: number
-  onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
-  snapIndicator?: Point | null
-  isExporting?: boolean
+// ── Draft state types ─────────────────────────────────────────────────────────
+
+interface LineDraft {
+  kind: 'line'
+  id: string
+  start: Point // px (content-space)
+  mid: Point
+  end: Point
 }
+
+interface PenDraft {
+  kind: 'pen'
+  id: string
+  points: number[] // flat [x0,y0,x1,y1,...] in px
+}
+
+type DraftState = LineDraft | PenDraft | null
+
+interface LineBodyDrag {
+  kind: 'line'
+  id: string
+  snapStart: Point
+  snapMid: Point
+  snapEnd: Point
+  pointerStart: Point
+  lastDx: number
+  lastDy: number
+}
+
+interface PenBodyDrag {
+  kind: 'pen'
+  id: string
+  snapPoints: number[]
+  pointerStart: Point
+  lastDx: number
+  lastDy: number
+}
+
+type BodyDragSnap = LineBodyDrag | PenBodyDrag | null
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Recompute the mid control-point when an endpoint moves, preserving the
+ * curve shape by working in chord-local (tangent/normal) coordinates and
+ * scaling both components proportionally with the new chord length.
+ *
+ * This avoids the world-space delta shortcut which produces wrong results
+ * when the chord rotates (e.g. a 90° pivot of one endpoint).
+ */
+function recomputeMid(
+  newStart: Point,
+  newEnd: Point,
+  origStart: Point,
+  origMid: Point,
+  origEnd: Point,
+): Point {
+  const origDx = origEnd.x - origStart.x
+  const origDy = origEnd.y - origStart.y
+  const origLen = Math.hypot(origDx, origDy)
+  if (origLen < 1) return origMid // degenerate original chord — keep mid
+
+  // Original chord frame (unit tangent + unit normal)
+  const origTx = origDx / origLen;  const origTy = origDy / origLen
+  const origNx = -origTy;           const origNy = origTx
+
+  // Decompose origMid's offset from the chord midpoint into the chord frame
+  const offX = origMid.x - (origStart.x + origEnd.x) / 2
+  const offY = origMid.y - (origStart.y + origEnd.y) / 2
+  const tComp = offX * origTx + offY * origTy // along-chord
+  const nComp = offX * origNx + offY * origNy // cross-chord (curvature strength)
+
+  // New chord frame
+  const newDx = newEnd.x - newStart.x
+  const newDy = newEnd.y - newStart.y
+  const newLen = Math.hypot(newDx, newDy)
+  if (newLen < 1) {
+    return { x: (newStart.x + newEnd.x) / 2, y: (newStart.y + newEnd.y) / 2 }
+  }
+
+  const newTx = newDx / newLen;  const newTy = newDy / newLen
+  const newNx = -newTy;          const newNy = newTx
+
+  // Scale proportionally with new chord length — keeps curve self-similar
+  const scale = newLen / origLen
+  return {
+    x: (newStart.x + newEnd.x) / 2 + tComp * scale * newTx + nComp * scale * newNx,
+    y: (newStart.y + newEnd.y) / 2 + tComp * scale * newTy + nComp * scale * newNy,
+  }
+}
+
+// ── ControlHandle ─────────────────────────────────────────────────────────────
 
 function ControlHandle({
   x,
   y,
   radius,
   zoom,
+  onDragMove,
   onDragEnd,
 }: {
   x: number
   y: number
   radius: number
   zoom: number
+  onDragMove: (p: Point) => void
   onDragEnd: (p: Point) => void
 }) {
   return (
@@ -49,9 +137,24 @@ function ControlHandle({
       stroke={HANDLE_STROKE}
       strokeWidth={2 / zoom}
       draggable
+      onDragMove={(e) => onDragMove({ x: e.target.x(), y: e.target.y() })}
       onDragEnd={(e) => onDragEnd({ x: e.target.x(), y: e.target.y() })}
     />
   )
+}
+
+// ── SelectionLayer ────────────────────────────────────────────────────────────
+
+interface SelectionLayerProps {
+  objects: CanvasObject[]
+  selectedObjectIds: string[]
+  stageSize: StageSize
+  zoom: number
+  onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
+  snapIndicator?: Point | null
+  snap?: SnapFn
+  clearSnap?: () => void
+  isExporting?: boolean
 }
 
 export function SelectionLayer({
@@ -61,6 +164,8 @@ export function SelectionLayer({
   zoom,
   onUpdateObject,
   snapIndicator = null,
+  snap,
+  clearSnap,
   isExporting = false,
 }: SelectionLayerProps) {
   // Ref so drag callbacks always see the latest stageSize even after a window resize
@@ -68,6 +173,11 @@ export function SelectionLayer({
   useEffect(() => {
     stageSizeRef.current = stageSize
   }, [stageSize])
+
+  // Pixel-space draft positions for live visual feedback during any drag
+  const [draftState, setDraftState] = useState<DraftState>(null)
+  // Snapshot captured at body-drag start (does not drive renders)
+  const bodyDragRef = useRef<BodyDragSnap>(null)
 
   if (isExporting) {
     return null
@@ -83,78 +193,287 @@ export function SelectionLayer({
   return (
     <Layer>
       {selectedObjects.map((obj) => {
+        // ── Pen stroke ──────────────────────────────────────────────────────
         if (obj.type === 'pen') {
-          const pts = denormalizePoints(obj.points, stageSize)
-          return (
-            <Line
-              key={obj.id}
-              points={pts}
-              stroke={SELECTION_HIGHLIGHT}
-              strokeWidth={STROKE_SIZES[obj.width] + 6}
-              opacity={0.35}
-              tension={obj.tension}
-              lineCap="round"
-              lineJoin="round"
-              strokeScaleEnabled={false}
-              listening={false}
-            />
-          )
-        }
-
-        if (isLineObject(obj)) {
-          const start = denormalizePoint(obj.start, stageSize)
-          const mid = denormalizePoint(obj.mid, stageSize)
-          const end = denormalizePoint(obj.end, stageSize)
+          const committedPts = denormalizePoints(obj.points, stageSize)
+          const draftPen = draftState?.kind === 'pen' && draftState.id === obj.id
+            ? draftState
+            : null
+          const pts = draftPen ? draftPen.points : committedPts
 
           return (
             <Group key={obj.id}>
-              {/* dashed guide lines between control points */}
+              {/* Selection highlight — updates during body drag via draftPen */}
               <Line
-                points={[start.x, start.y, mid.x, mid.y, end.x, end.y]}
+                points={pts}
+                stroke={SELECTION_HIGHLIGHT}
+                strokeWidth={STROKE_SIZES[obj.width] + 6}
+                opacity={0.35}
+                tension={obj.tension}
+                lineCap="round"
+                lineJoin="round"
+                strokeScaleEnabled={false}
+                listening={false}
+              />
+              {/* Body drag handle — invisible wide hit area */}
+              <Line
+                points={committedPts}
+                stroke="black"
+                strokeWidth={STROKE_SIZES[obj.width] + BODY_HIT_WIDTH}
+                tension={obj.tension}
+                lineCap="round"
+                lineJoin="round"
+                hitStrokeWidth={STROKE_SIZES[obj.width] + BODY_HIT_WIDTH}
+                opacity={0}
+                strokeScaleEnabled={false}
+                draggable
+                dragBoundFunc={() => ({ x: 0, y: 0 })}
+                onDragStart={(e) => {
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  if (!ptr) return
+                  bodyDragRef.current = {
+                    kind: 'pen',
+                    id: obj.id,
+                    snapPoints: denormalizePoints(obj.points, stageSizeRef.current),
+                    pointerStart: ptr,
+                    lastDx: 0,
+                    lastDy: 0,
+                  }
+                }}
+                onDragMove={(e) => {
+                  const ref = bodyDragRef.current
+                  if (!ref || ref.kind !== 'pen' || ref.id !== obj.id) return
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  if (!ptr) return
+                  const dx = ptr.x - ref.pointerStart.x
+                  const dy = ptr.y - ref.pointerStart.y
+                  ref.lastDx = dx
+                  ref.lastDy = dy
+                  setDraftState({
+                    kind: 'pen',
+                    id: obj.id,
+                    points: ref.snapPoints.map((v, i) => (i % 2 === 0 ? v + dx : v + dy)),
+                  })
+                }}
+                onDragEnd={(e) => {
+                  const ref = bodyDragRef.current
+                  bodyDragRef.current = null
+                  if (!ref || ref.kind !== 'pen' || ref.id !== obj.id) {
+                    setDraftState(null)
+                    return
+                  }
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  // Fall back to last known delta if pointer is unavailable on release
+                  const dx = ptr ? ptr.x - ref.pointerStart.x : ref.lastDx
+                  const dy = ptr ? ptr.y - ref.pointerStart.y : ref.lastDy
+                  const ss = stageSizeRef.current
+                  const newPts = ref.snapPoints.map((v, i) => (i % 2 === 0 ? v + dx : v + dy))
+                  onUpdateObject(obj.id, (o) =>
+                    o.type === 'pen' ? { ...o, points: normalizePoints(newPts, ss) } : o,
+                  )
+                  setDraftState(null)
+                }}
+              />
+            </Group>
+          )
+        }
+
+        // ── LineObject (line / arrow / dotted) ──────────────────────────────
+        if (isLineObject(obj)) {
+          const cStart = denormalizePoint(obj.start, stageSize)
+          const cMid   = denormalizePoint(obj.mid,   stageSize)
+          const cEnd   = denormalizePoint(obj.end,   stageSize)
+
+          const draftLine = draftState?.kind === 'line' && draftState.id === obj.id
+            ? draftState
+            : null
+          const dStart = draftLine ? draftLine.start : cStart
+          const dMid   = draftLine ? draftLine.mid   : cMid
+          const dEnd   = draftLine ? draftLine.end   : cEnd
+
+          return (
+            <Group key={obj.id}>
+              {/* Body drag handle — transparent bezier hit area, lowest priority */}
+              <Shape
+                opacity={0}
+                stroke="black"
+                strokeWidth={BODY_HIT_WIDTH}
+                hitStrokeWidth={BODY_HIT_WIDTH}
+                strokeScaleEnabled={false}
+                draggable
+                dragBoundFunc={() => ({ x: 0, y: 0 })}
+                sceneFunc={(ctx, shape) => {
+                  ctx.beginPath()
+                  ctx.moveTo(cStart.x, cStart.y)
+                  ctx.quadraticCurveTo(cMid.x, cMid.y, cEnd.x, cEnd.y)
+                  ctx.strokeShape(shape)
+                }}
+                onDragStart={(e) => {
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  if (!ptr) return
+                  bodyDragRef.current = {
+                    kind: 'line',
+                    id: obj.id,
+                    snapStart: cStart,
+                    snapMid:   cMid,
+                    snapEnd:   cEnd,
+                    pointerStart: ptr,
+                    lastDx: 0,
+                    lastDy: 0,
+                  }
+                }}
+                onDragMove={(e) => {
+                  const ref = bodyDragRef.current
+                  if (!ref || ref.kind !== 'line' || ref.id !== obj.id) return
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  if (!ptr) return
+                  const dx = ptr.x - ref.pointerStart.x
+                  const dy = ptr.y - ref.pointerStart.y
+                  ref.lastDx = dx
+                  ref.lastDy = dy
+                  setDraftState({
+                    kind: 'line',
+                    id: obj.id,
+                    start: { x: ref.snapStart.x + dx, y: ref.snapStart.y + dy },
+                    mid:   { x: ref.snapMid.x   + dx, y: ref.snapMid.y   + dy },
+                    end:   { x: ref.snapEnd.x   + dx, y: ref.snapEnd.y   + dy },
+                  })
+                }}
+                onDragEnd={(e) => {
+                  const ref = bodyDragRef.current
+                  bodyDragRef.current = null
+                  if (!ref || ref.kind !== 'line' || ref.id !== obj.id) {
+                    setDraftState(null)
+                    return
+                  }
+                  const ptr = e.target.getStage()?.getRelativePointerPosition()
+                  // Fall back to last known delta if pointer is unavailable on release
+                  const dx = ptr ? ptr.x - ref.pointerStart.x : ref.lastDx
+                  const dy = ptr ? ptr.y - ref.pointerStart.y : ref.lastDy
+
+                  let newStart: Point = { x: ref.snapStart.x + dx, y: ref.snapStart.y + dy }
+                  let newEnd:   Point = { x: ref.snapEnd.x   + dx, y: ref.snapEnd.y   + dy }
+                  let newMid:   Point = { x: ref.snapMid.x   + dx, y: ref.snapMid.y   + dy }
+
+                  if (snap) {
+                    // Rigid translation: snap whichever endpoint is closer to a target,
+                    // then apply the same delta to all three points to avoid deforming.
+                    const sStart = snap(newStart, obj.id)
+                    const sEnd   = snap(newEnd,   obj.id)
+                    const snapDelta = sStart.snapped
+                      ? { x: sStart.point.x - newStart.x, y: sStart.point.y - newStart.y }
+                      : sEnd.snapped
+                        ? { x: sEnd.point.x - newEnd.x, y: sEnd.point.y - newEnd.y }
+                        : null
+                    if (snapDelta) {
+                      newStart = { x: newStart.x + snapDelta.x, y: newStart.y + snapDelta.y }
+                      newEnd   = { x: newEnd.x   + snapDelta.x, y: newEnd.y   + snapDelta.y }
+                      newMid   = { x: newMid.x   + snapDelta.x, y: newMid.y   + snapDelta.y }
+                    }
+                    clearSnap?.()
+                  }
+
+                  const ss = stageSizeRef.current
+                  onUpdateObject(obj.id, (o) =>
+                    isLineObject(o)
+                      ? {
+                          ...o,
+                          start: normalizePoint(newStart, ss),
+                          mid:   normalizePoint(newMid,   ss),
+                          end:   normalizePoint(newEnd,   ss),
+                        }
+                      : o,
+                  )
+                  setDraftState(null)
+                }}
+              />
+
+              {/* Dashed guide lines — update live during any drag */}
+              <Line
+                points={[dStart.x, dStart.y, dMid.x, dMid.y, dEnd.x, dEnd.y]}
                 stroke={SELECTION_HIGHLIGHT}
                 strokeWidth={1}
                 opacity={0.5}
                 dash={[4, 4]}
                 listening={false}
               />
+
+              {/* Live bezier overlay — only rendered during an active drag */}
+              {draftLine && (
+                <Shape
+                  stroke={obj.color}
+                  strokeWidth={STROKE_SIZES[obj.width]}
+                  opacity={obj.opacity}
+                  lineCap="round"
+                  lineJoin="round"
+                  strokeScaleEnabled={false}
+                  listening={false}
+                  sceneFunc={(ctx, shape) => {
+                    ctx.beginPath()
+                    ctx.moveTo(dStart.x, dStart.y)
+                    ctx.quadraticCurveTo(dMid.x, dMid.y, dEnd.x, dEnd.y)
+                    ctx.strokeShape(shape)
+                  }}
+                />
+              )}
+
+              {/* Control handles — rendered last so they sit above the body drag shape */}
               <ControlHandle
-                x={start.x}
-                y={start.y}
+                x={cStart.x}
+                y={cStart.y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragEnd={(p) =>
+                onDragMove={(p) => {
+                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: p, mid: newMid, end: cEnd })
+                }}
+                onDragEnd={(p) => {
+                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
+                  const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, start: normalizePoint(p, stageSizeRef.current) }
+                      ? { ...o, start: normalizePoint(p, ss), mid: normalizePoint(newMid, ss) }
                       : o,
                   )
-                }
+                  setDraftState(null)
+                }}
               />
               <ControlHandle
-                x={mid.x}
-                y={mid.y}
+                x={cMid.x}
+                y={cMid.y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragEnd={(p) =>
+                onDragMove={(p) => {
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: p, end: cEnd })
+                }}
+                onDragEnd={(p) => {
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
                       ? { ...o, mid: normalizePoint(p, stageSizeRef.current) }
                       : o,
                   )
-                }
+                  setDraftState(null)
+                }}
               />
               <ControlHandle
-                x={end.x}
-                y={end.y}
+                x={cEnd.x}
+                y={cEnd.y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragEnd={(p) =>
+                onDragMove={(p) => {
+                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: p })
+                }}
+                onDragEnd={(p) => {
+                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
+                  const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, end: normalizePoint(p, stageSizeRef.current) }
+                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(p, ss) }
                       : o,
                   )
-                }
+                  setDraftState(null)
+                }}
               />
             </Group>
           )

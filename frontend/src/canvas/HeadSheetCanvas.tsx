@@ -414,6 +414,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           zoom={zoom}
           onUpdateObject={onUpdateObject}
           snapIndicator={snapIndicator}
+          snap={snap}
+          clearSnap={clearSnap}
           isExporting={isExporting}
         />
       </Stage>
