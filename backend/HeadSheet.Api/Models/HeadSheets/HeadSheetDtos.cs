@@ -28,3 +28,6 @@ public record HeadSheetSummaryResponseDto(
     DateTime UpdatedAt);
 
 public record PagedResponseDto<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
+
+// 5 MB cap: ~2,500 strokes of 200 points each — well beyond any real session.
+public record SaveStrokesRequestDto([Required, MaxLength(5_000_000)] string StrokesJson);

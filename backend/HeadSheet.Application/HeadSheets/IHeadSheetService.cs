@@ -20,6 +20,7 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, i
 
 public record CreateHeadSheetRequest(string Name, string? ClientName, string TemplateType);
 public record UpdateHeadSheetRequest(string Name, string? ClientName);
+public record SaveStrokesRequest(string StrokesJson);
 
 public interface IHeadSheetService
 {
@@ -31,6 +32,8 @@ public interface IHeadSheetService
     Task<HeadSheetDto> CreateAsync(Guid userId, CreateHeadSheetRequest request, CancellationToken ct = default);
 
     Task<HeadSheetDto?> UpdateAsync(Guid userId, Guid id, UpdateHeadSheetRequest request, CancellationToken ct = default);
+
+    Task<HeadSheetDto?> SaveStrokesAsync(Guid userId, Guid id, string strokesJson, CancellationToken ct = default);
 
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default);
 }

@@ -73,6 +73,21 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return ToDto(sheet);
     }
 
+    public async Task<HeadSheetDto?> SaveStrokesAsync(
+        Guid userId, Guid id, string strokesJson, CancellationToken ct = default)
+    {
+        var sheet = await db.HeadSheets
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId, ct);
+
+        if (sheet is null) return null;
+
+        sheet.StrokesJson = strokesJson;
+        sheet.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return ToDto(sheet);
+    }
+
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
         var affected = await db.HeadSheets

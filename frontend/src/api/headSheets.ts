@@ -5,6 +5,7 @@ import type {
   PagedResult,
   UpdateHeadSheetPayload,
 } from '../types/headSheet'
+import type { Stroke } from '../types/stroke'
 import { apiClient } from './client'
 
 type ApiResponse<T> = { success: boolean; data: T; error: string | null }
@@ -23,6 +24,13 @@ export const headSheetsApi = {
 
   update: (id: string, payload: UpdateHeadSheetPayload) =>
     apiClient.put<ApiResponse<HeadSheet>>(`/head-sheets/${id}`, payload).then((r) => r.data),
+
+  saveStrokes: (id: string, strokes: Stroke[]) =>
+    apiClient
+      .put<ApiResponse<HeadSheet>>(`/head-sheets/${id}/strokes`, {
+        strokesJson: JSON.stringify(strokes),
+      })
+      .then((r) => r.data),
 
   delete: (id: string) => apiClient.delete(`/head-sheets/${id}`),
 }
