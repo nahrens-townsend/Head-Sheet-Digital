@@ -7,26 +7,36 @@ import type { CanvasObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
 import { usePenTool } from './tools/usePenTool';
+import { useSelectTool } from './tools/useSelectTool';
 import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
+import { SelectionLayer } from './layers/SelectionLayer';
 
 interface HeadSheetCanvasProps {
   objects: CanvasObject[];
   templateType: TemplateType;
   onObjectComplete: (object: CanvasObject) => void;
+  onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void;
+  onDeleteObjects: (ids: string[]) => void;
 }
 
 type TemplateRect = { x: number; y: number; width: number; height: number };
 
-export function HeadSheetCanvas({ objects, templateType, onObjectComplete }: HeadSheetCanvasProps) {
+export function HeadSheetCanvas({
+  objects,
+  templateType,
+  onObjectComplete,
+  onUpdateObject,
+  onDeleteObjects,
+}: HeadSheetCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const liveLineRef = useRef<Konva.Line | null>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
-  const { tool, color, strokeSize } = useCanvasStore();
+  const { tool, color, strokeSize, selectedObjectIds } = useCanvasStore();
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -118,14 +128,21 @@ export function HeadSheetCanvas({ objects, templateType, onObjectComplete }: Hea
 
   const eraserTool = useEraserTool({
     stageRef,
-    liveLineRef,
     stageSize,
-    strokeSize,
-    onObjectComplete,
+    objects,
+    onDeleteObjects,
+  });
+
+  const selectTool = useSelectTool({
+    stageRef,
+    stageSize,
+    objects,
   });
 
   const pointerHandlers = useMemo(() => {
     switch (tool) {
+      case 'select':
+        return selectTool;
       case 'line':
         return lineTool;
       case 'eraser':
@@ -134,10 +151,10 @@ export function HeadSheetCanvas({ objects, templateType, onObjectComplete }: Hea
       default:
         return penTool;
     }
-  }, [eraserTool, lineTool, penTool, tool]);
+  }, [eraserTool, lineTool, penTool, selectTool, tool]);
 
   return (
-    <div ref={containerRef} className="head-sheet-canvas">
+    <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool}`}>
       <Stage
         ref={stageRef}
         width={stageSize.width}
@@ -160,6 +177,14 @@ export function HeadSheetCanvas({ objects, templateType, onObjectComplete }: Hea
           strokePixelWidth={strokePixelWidth}
           previewPoints={lineTool.previewPoints}
         />
+        {tool === 'select' && (
+          <SelectionLayer
+            objects={objects}
+            selectedObjectIds={selectedObjectIds}
+            stageSize={stageSize}
+            onUpdateObject={onUpdateObject}
+          />
+        )}
       </Stage>
     </div>
   );
