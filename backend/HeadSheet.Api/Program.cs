@@ -2,6 +2,7 @@ using System.Text;
 using HeadSheet.Application.Auth;
 using HeadSheet.Application.HeadSheets;
 using HeadSheet.Application.Interfaces;
+using HeadSheet.Application.Templates;
 using HeadSheet.Infrastructure.Auth;
 using HeadSheet.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,6 +26,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Head sheet services
 builder.Services.AddScoped<IHeadSheetService, HeadSheetService>();
+builder.Services.AddScoped<ITemplateService, TemplateService>();
 
 // JWT authentication
 var jwtSecret = builder.Configuration["Jwt:Secret"]

@@ -5,7 +5,6 @@ import type { CanvasObject } from '../../types/canvasObject'
 import {
   getStagePoint,
   type StageSize,
-  type StagePointerEvent,
 } from '../utils/canvasUtils'
 import { hitTestCanvasObject, eraserThreshold } from '../utils/hitTest'
 
@@ -42,7 +41,7 @@ export function useEraserTool({
   )
 
   const onPointerDown = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       const px = getStagePoint(stageRef, stageSize)
       if (!px) return
       isActiveRef.current = true
@@ -53,7 +52,7 @@ export function useEraserTool({
   )
 
   const onPointerMove = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!isActiveRef.current) return
       const px = getStagePoint(stageRef, stageSize)
       if (!px) return
@@ -64,7 +63,7 @@ export function useEraserTool({
 
   // Commit the whole gesture as a single undo step on pointer-up
   const onPointerUp = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       isActiveRef.current = false
       const ids = [...pendingRef.current]
       pendingRef.current = new Set()
@@ -75,4 +74,3 @@ export function useEraserTool({
 
   return { onPointerDown, onPointerMove, onPointerUp }
 }
-

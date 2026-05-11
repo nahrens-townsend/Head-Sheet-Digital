@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Konva from 'konva';
 import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
@@ -20,6 +20,11 @@ import { SelectionLayer } from './layers/SelectionLayer';
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
 
+export interface HeadSheetCanvasHandle {
+  getExportDataUrl: () => Promise<string>;
+  getThumbnailDataUrl: () => Promise<string>;
+}
+
 interface HeadSheetCanvasProps {
   objects: CanvasObject[];
   templateType: TemplateType;
@@ -30,18 +35,20 @@ interface HeadSheetCanvasProps {
 
 type TemplateRect = { x: number; y: number; width: number; height: number };
 
-export function HeadSheetCanvas({
+export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvasProps>(function HeadSheetCanvas({
   objects,
   templateType,
   onObjectComplete,
   onUpdateObject,
   onDeleteObjects,
-}: HeadSheetCanvasProps) {
+}, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const liveLineRef = useRef<Konva.Line | null>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportQueueRef = useRef(Promise.resolve() as Promise<void>)
   const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset } =
     useCanvasStore();
 
@@ -275,6 +282,50 @@ export function HeadSheetCanvas({
 
   const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize, zoom);
 
+  const exportStage = useCallback(
+    (maxDimension?: number) => {
+      const task = async () => {
+        const stage = stageRef.current;
+        if (!stage) {
+          throw new Error('Canvas stage is not ready.')
+        }
+
+        setIsExporting(true);
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+
+        const previousScale = { x: stage.scaleX(), y: stage.scaleY() };
+        const previousPosition = { x: stage.x(), y: stage.y() };
+
+        try {
+          stage.scale({ x: 1, y: 1 });
+          stage.position({ x: 0, y: 0 });
+          stage.batchDraw();
+
+          const pixelRatio = maxDimension
+            ? Math.min(1, maxDimension / Math.max(stageSize.width, stageSize.height))
+            : 1;
+
+          return stage.toDataURL({ pixelRatio });
+        } finally {
+          stage.scale(previousScale);
+          stage.position(previousPosition);
+          stage.batchDraw();
+          setIsExporting(false);
+        }
+      };
+
+      const next = exportQueueRef.current.then(task, task);
+      exportQueueRef.current = next.then(() => undefined, () => undefined);
+      return next;
+    },
+    [stageSize.width, stageSize.height],
+  );
+
+  useImperativeHandle(ref, () => ({
+    getExportDataUrl: () => exportStage(),
+    getThumbnailDataUrl: () => exportStage(320),
+  }), [exportStage]);
+
   const commonVectorOpts = { stageRef, stageSize, color, strokeSize, onObjectComplete, snap, clearSnap };
 
   const penTool = usePenTool({
@@ -347,13 +398,14 @@ export function HeadSheetCanvas({
           templateImage={templateImage}
           templateRect={templateRect}
         />
-        <ObjectsLayer objects={objects} stageSize={stageSize} />
+        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} />
         <LiveLayer
           liveLineRef={liveLineRef}
           tool={tool}
           color={color}
           strokePixelWidth={strokePixelWidth}
           previewPoints={activePreviewPoints}
+          isExporting={isExporting}
         />
         <SelectionLayer
           objects={objects}
@@ -362,8 +414,9 @@ export function HeadSheetCanvas({
           zoom={zoom}
           onUpdateObject={onUpdateObject}
           snapIndicator={snapIndicator}
+          isExporting={isExporting}
         />
       </Stage>
     </div>
   );
-}
+});

@@ -9,6 +9,7 @@ interface LiveLayerProps {
   color: string
   strokePixelWidth: number
   previewPoints: number[] | null
+  isExporting?: boolean
 }
 
 const VECTOR_TOOLS: ToolType[] = ['line', 'arrow', 'dotted']
@@ -19,7 +20,12 @@ export function LiveLayer({
   color,
   strokePixelWidth,
   previewPoints,
+  isExporting = false,
 }: LiveLayerProps) {
+  if (isExporting) {
+    return null
+  }
+
   const liveStrokeColor = tool === 'eraser' ? '#ffffff' : color
   const liveStrokeWidth = tool === 'eraser' ? strokePixelWidth * 2 : strokePixelWidth
   const isVectorTool = VECTOR_TOOLS.includes(tool)

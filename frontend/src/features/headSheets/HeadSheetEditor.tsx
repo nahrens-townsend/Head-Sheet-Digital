@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CanvasToolbar } from '../../canvas/CanvasToolbar'
 import { HeadSheetCanvas } from '../../canvas/HeadSheetCanvas'
@@ -8,19 +8,25 @@ import { useCanvasHistory } from '../../canvas/useCanvasHistory'
 import { useCanvasStore } from '../../stores/canvasStore'
 import { parseCanvasData } from '../../types/canvasObject'
 import { duplicateObject } from '../../canvas/utils/objectUtils'
-import { useGetHeadSheet, useSaveStrokes } from './useHeadSheets'
+import type { HeadSheetCanvasHandle } from '../../canvas/HeadSheetCanvas'
+import { SaveTemplateModal } from './SaveTemplateModal'
+import { useCreateTemplate, useGetHeadSheet, useSaveStrokes, useSaveThumbnail } from './useHeadSheets'
 
 export function HeadSheetEditor() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const sheetId = id ?? ''
   const initializedSheetIdRef = useRef<string | null>(null)
+  const canvasRef = useRef<HeadSheetCanvasHandle | null>(null)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const { data, isLoading, isError } = useGetHeadSheet(sheetId)
   const { addObject, updateObject, deleteObjects, undo, redo, canUndo, canRedo, objects, setObjects } =
     useCanvasHistory()
   const saveStatus = useCanvasStore((state) => state.saveStatus)
   const { selectedObjectIds, setSelectedObjectIds, setZoom, setPanOffset } = useCanvasStore()
   const saveMutation = useSaveStrokes(sheetId)
+  const saveThumbnailMutation = useSaveThumbnail(sheetId)
+  const createTemplateMutation = useCreateTemplate()
 
   useEffect(() => {
     initializedSheetIdRef.current = null
@@ -39,9 +45,31 @@ export function HeadSheetEditor() {
     setPanOffset({ x: 0, y: 0 })
   }, [data?.data, setObjects, setZoom, setPanOffset])
 
-  useAutoSave(sheetId, { version: 2, objects }, async (canvasData) => {
-    await saveMutation.mutateAsync(canvasData)
-  }, data?.data?.strokesJson)
+  useAutoSave(
+    sheetId,
+    { version: 2, objects },
+    async (canvasData) => {
+      const res = await saveMutation.mutateAsync(canvasData)
+      if (!res.success || !res.data) {
+        throw new Error(res.error ?? 'Failed to save head sheet.')
+      }
+      return res.data
+    },
+    async (saveResult) => {
+      const thumbnailDataUrl = await canvasRef.current?.getThumbnailDataUrl()
+      if (!thumbnailDataUrl) return
+
+      try {
+        await saveThumbnailMutation.mutateAsync({
+          thumbnailDataUrl,
+          expectedUpdatedAt: saveResult.updatedAt,
+        })
+      } catch (error) {
+        console.error('Failed to save sheet thumbnail.', error)
+      }
+    },
+    data?.data?.strokesJson,
+  )
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -114,6 +142,39 @@ export function HeadSheetEditor() {
     return () => window.removeEventListener('keydown', handler)
   }, [redo, undo, selectedObjectIds, objects, deleteObjects, addObject, setSelectedObjectIds, setZoom, setPanOffset])
 
+  async function handleExport() {
+    try {
+      const dataUrl = await canvasRef.current?.getExportDataUrl()
+      if (!dataUrl) return
+
+      const filename = `${sheet.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'head-sheet'}.png`
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = filename
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (error) {
+      console.error('Failed to export canvas.', error)
+    }
+  }
+
+  async function handleSaveTemplate(name: string) {
+    try {
+      const thumbnailDataUrl = await canvasRef.current?.getThumbnailDataUrl()
+      await createTemplateMutation.mutateAsync({
+        name,
+        templateType: sheet.templateType,
+        canvasData: { version: 2, objects },
+        thumbnailDataUrl: thumbnailDataUrl ?? undefined,
+      })
+      setShowSaveTemplate(false)
+    } catch (error) {
+      console.error('Failed to save template.', error)
+    }
+  }
+
   if (isLoading) {
     return <div className="editor-loading">Loading…</div>
   }
@@ -129,14 +190,18 @@ export function HeadSheetEditor() {
       <CanvasToolbar
         canUndo={canUndo}
         canRedo={canRedo}
+        canSaveTemplate={objects.length > 0}
         onUndo={undo}
         onRedo={redo}
+        onExport={handleExport}
+        onSaveTemplate={() => setShowSaveTemplate(true)}
         saveStatus={saveStatus}
         sheetName={sheet.name}
         onBack={() => navigate('/sheets')}
       />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
+          ref={canvasRef}
           objects={objects}
           templateType={sheet.templateType}
           onObjectComplete={addObject}
@@ -150,6 +215,15 @@ export function HeadSheetEditor() {
           onDuplicateObject={addObject}
         />
       </div>
+      {showSaveTemplate && (
+        <SaveTemplateModal
+          defaultName={`${sheet.name} Template`}
+          errorMessage={createTemplateMutation.isError ? 'Failed to save template. Please try again.' : null}
+          isSaving={createTemplateMutation.isPending}
+          onClose={() => setShowSaveTemplate(false)}
+          onSave={handleSaveTemplate}
+        />
+      )}
     </div>
   )
 }

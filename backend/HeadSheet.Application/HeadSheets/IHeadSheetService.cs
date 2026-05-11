@@ -6,6 +6,7 @@ public record HeadSheetDto(
     string? ClientName,
     string TemplateType,
     string StrokesJson,
+    string? ThumbnailUrl,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -14,13 +15,23 @@ public record HeadSheetSummaryDto(
     string Name,
     string? ClientName,
     string TemplateType,
+    string? ThumbnailUrl,
     DateTime UpdatedAt);
 
 public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
-public record CreateHeadSheetRequest(string Name, string? ClientName, string TemplateType);
+public record CreateHeadSheetRequest(string Name, string? ClientName, string TemplateType, Guid? TemplateId);
 public record UpdateHeadSheetRequest(string Name, string? ClientName);
 public record SaveStrokesRequest(string StrokesJson);
+
+public enum SaveThumbnailStatus
+{
+    Saved,
+    NotFound,
+    Conflict,
+}
+
+public record SaveThumbnailResult(SaveThumbnailStatus Status, HeadSheetDto? Sheet);
 
 public interface IHeadSheetService
 {
@@ -29,11 +40,14 @@ public interface IHeadSheetService
 
     Task<HeadSheetDto?> GetAsync(Guid userId, Guid id, CancellationToken ct = default);
 
-    Task<HeadSheetDto> CreateAsync(Guid userId, CreateHeadSheetRequest request, CancellationToken ct = default);
+    Task<HeadSheetDto?> CreateAsync(Guid userId, CreateHeadSheetRequest request, CancellationToken ct = default);
 
     Task<HeadSheetDto?> UpdateAsync(Guid userId, Guid id, UpdateHeadSheetRequest request, CancellationToken ct = default);
 
     Task<HeadSheetDto?> SaveStrokesAsync(Guid userId, Guid id, string strokesJson, CancellationToken ct = default);
+
+    Task<SaveThumbnailResult> SaveThumbnailAsync(
+        Guid userId, Guid id, string thumbnailUrl, DateTime expectedUpdatedAt, CancellationToken ct = default);
 
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default);
 }

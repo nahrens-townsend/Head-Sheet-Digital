@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import type { TemplateType } from '../../types/headSheet'
-import { useCreateHeadSheet } from './useHeadSheets'
+import { useCreateHeadSheet, useTemplates } from './useHeadSheets'
 
 interface Props {
   onClose: () => void
@@ -11,7 +11,9 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
   const [name, setName] = useState('')
   const [clientName, setClientName] = useState('')
   const [templateType, setTemplateType] = useState<TemplateType>('front')
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const createSheet = useCreateHeadSheet()
+  const templates = useTemplates()
   const nameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -25,6 +27,7 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
         name: name.trim() || 'Untitled Sheet',
         clientName: clientName.trim() || undefined,
         templateType,
+        templateId: selectedTemplateId ?? undefined,
       })
       if (res.success && res.data) {
         onCreated(res.data.id)
@@ -77,12 +80,59 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
               <select
                 id="template-type"
                 value={templateType}
+                disabled={selectedTemplateId !== null}
                 onChange={(e) => setTemplateType(e.target.value as TemplateType)}
               >
                 <option value="front">Front</option>
                 <option value="back">Back</option>
                 <option value="side">Side</option>
               </select>
+            </div>
+            <div className="template-picker">
+              <div className="template-picker__header">
+                <label>Start from template</label>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => {
+                    setSelectedTemplateId(null)
+                    setTemplateType('front')
+                  }}
+                >
+                  Blank
+                </button>
+              </div>
+              {templates.isLoading && <p className="template-picker__status">Loading templates…</p>}
+              {templates.isError && <p className="template-picker__status template-picker__status--error">Failed to load templates.</p>}
+              {!templates.isLoading && !templates.isError && (templates.data?.data ?? []).length === 0 && (
+                <p className="template-picker__status">No saved templates yet.</p>
+              )}
+              <div className="template-picker__grid">
+                {(templates.data?.data ?? []).map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className={`template-picker__card ${selectedTemplateId === template.id ? 'template-picker__card--active' : ''}`}
+                    onClick={() => {
+                      setSelectedTemplateId(template.id)
+                      setTemplateType(template.templateType)
+                    }}
+                    aria-pressed={selectedTemplateId === template.id}
+                  >
+                    <div className="template-picker__thumb">
+                      {template.thumbnailUrl ? (
+                        <img src={template.thumbnailUrl} alt="" loading="lazy" />
+                      ) : (
+                        <span>Preview</span>
+                      )}
+                    </div>
+                    <div className="template-picker__name">{template.name}</div>
+                    <div className="template-picker__meta">
+                      {template.templateType} view
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
             {createSheet.isError && (
               <p className="field-error" role="alert">

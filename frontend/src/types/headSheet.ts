@@ -6,6 +6,7 @@ export interface HeadSheet {
   clientName: string | null
   templateType: TemplateType
   strokesJson: string
+  thumbnailUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -15,6 +16,7 @@ export interface HeadSheetSummary {
   name: string
   clientName: string | null
   templateType: TemplateType
+  thumbnailUrl: string | null
   updatedAt: string
 }
 
@@ -22,6 +24,7 @@ export interface CreateHeadSheetPayload {
   name: string
   clientName?: string
   templateType: TemplateType
+  templateId?: string
 }
 
 export interface UpdateHeadSheetPayload {
