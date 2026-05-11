@@ -84,6 +84,28 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
             sheet.StrokesJson, sheet.CreatedAt, sheet.UpdatedAt)));
     }
 
+    [HttpPut("{id:guid}/strokes")]
+    public async Task<IActionResult> SaveStrokes(
+        Guid id, [FromBody] SaveStrokesRequestDto dto, CancellationToken ct = default)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        // Validate JSON before hitting the jsonb column — malformed input would 500.
+        try { using var _ = System.Text.Json.JsonDocument.Parse(dto.StrokesJson); }
+        catch (System.Text.Json.JsonException)
+        {
+            return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>("strokesJson must be valid JSON."));
+        }
+
+        var sheet = await headSheetService.SaveStrokesAsync(userId.Value, id, dto.StrokesJson, ct);
+        if (sheet is null) return NotFound(ApiResponse.Fail<HeadSheetResponseDto>("Head sheet not found."));
+
+        return Ok(ApiResponse.Ok(new HeadSheetResponseDto(
+            sheet.Id, sheet.Name, sheet.ClientName, sheet.TemplateType,
+            sheet.StrokesJson, sheet.CreatedAt, sheet.UpdatedAt)));
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
     {
