@@ -1,12 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Konva from 'konva';
-import { Image as KonvaImage, Layer, Line, Rect, Stage } from 'react-konva';
+import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
 import type { TemplateType } from '../types/headSheet';
 import type { Stroke } from '../types/stroke';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
 import { usePenTool } from './tools/usePenTool';
+import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
+import { BackgroundLayer } from './layers/BackgroundLayer';
+import { ObjectsLayer } from './layers/ObjectsLayer';
+import { LiveLayer } from './layers/LiveLayer';
 
 interface HeadSheetCanvasProps {
   strokes: Stroke[];
@@ -14,20 +18,7 @@ interface HeadSheetCanvasProps {
   onStrokeComplete: (stroke: Stroke) => void;
 }
 
-interface StageSize {
-  width: number;
-  height: number;
-}
-
-type StagePointerHandler = (
-  event: Konva.KonvaEventObject<PointerEvent | MouseEvent | TouchEvent>,
-) => void;
-
-function denormalizePoints(points: number[], stageSize: StageSize) {
-  return points.map((value, index) =>
-    index % 2 === 0 ? value * stageSize.width : value * stageSize.height,
-  );
-}
+type TemplateRect = { x: number; y: number; width: number; height: number };
 
 export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: HeadSheetCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -35,7 +26,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
   const liveLineRef = useRef<Konva.Line | null>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
-  const { tool, color, brushSize } = useCanvasStore();
+  const { tool, color, strokeSize } = useCanvasStore();
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -87,7 +78,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     };
   }, [templateType]);
 
-  const templateRect = useMemo(() => {
+  const templateRect = useMemo<TemplateRect | null>(() => {
     if (!templateImage) {
       return null;
     }
@@ -106,12 +97,14 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     };
   }, [stageSize.height, stageSize.width, templateImage]);
 
+  const strokePixelWidth = STROKE_SIZES[strokeSize];
+
   const penTool = usePenTool({
     stageRef,
     liveLineRef,
     stageSize,
     color,
-    brushSize,
+    strokeSize,
     onStrokeComplete,
   });
 
@@ -119,7 +112,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     stageRef,
     stageSize,
     color,
-    brushSize,
+    strokeSize,
     onStrokeComplete,
   });
 
@@ -127,7 +120,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     stageRef,
     liveLineRef,
     stageSize,
-    brushSize,
+    strokeSize,
     onStrokeComplete,
   });
 
@@ -143,9 +136,6 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     }
   }, [eraserTool, lineTool, penTool, tool]);
 
-  const liveStrokeColor = tool === 'eraser' ? '#ffffff' : color;
-  const liveStrokeWidth = tool === 'eraser' ? brushSize * 2 : brushSize;
-
   return (
     <div ref={containerRef} className="head-sheet-canvas">
       <Stage
@@ -157,65 +147,19 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
         onPointerUp={pointerHandlers.onPointerUp as StagePointerHandler}
         onPointerLeave={pointerHandlers.onPointerUp as StagePointerHandler}
       >
-        <Layer listening={false}>
-          <Rect x={0} y={0} width={stageSize.width} height={stageSize.height} fill="#ffffff" />
-          {templateRect && templateImage && (
-            <KonvaImage
-              image={templateImage}
-              x={templateRect.x}
-              y={templateRect.y}
-              width={templateRect.width}
-              height={templateRect.height}
-              opacity={0.9}
-            />
-          )}
-        </Layer>
-
-        <Layer listening={false}>
-          {strokes.map((stroke) => (
-            <Line
-              key={stroke.id}
-              points={denormalizePoints(stroke.points, stageSize)}
-              stroke={stroke.color}
-              strokeWidth={stroke.width}
-              opacity={stroke.opacity}
-              tension={stroke.tension ?? 0}
-              lineCap={stroke.lineCap ?? 'round'}
-              lineJoin={stroke.lineJoin ?? 'round'}
-              strokeScaleEnabled={false}
-              globalCompositeOperation={
-                stroke.tool === 'eraser' ? 'destination-out' : 'source-over'
-              }
-            />
-          ))}
-        </Layer>
-
-        <Layer listening={false}>
-          <Line
-            ref={liveLineRef}
-            points={[]}
-            stroke={liveStrokeColor}
-            strokeWidth={liveStrokeWidth}
-            opacity={1}
-            tension={tool === 'line' ? 0 : 0.35}
-            lineCap="round"
-            lineJoin="round"
-            strokeScaleEnabled={false}
-            visible={tool !== 'line'}
-          />
-          {lineTool.previewPoints && tool === 'line' && (
-            <Line
-              points={lineTool.previewPoints}
-              stroke={color}
-              strokeWidth={brushSize}
-              opacity={1}
-              tension={0}
-              lineCap="round"
-              lineJoin="round"
-              strokeScaleEnabled={false}
-            />
-          )}
-        </Layer>
+        <BackgroundLayer
+          stageSize={stageSize}
+          templateImage={templateImage}
+          templateRect={templateRect}
+        />
+        <ObjectsLayer strokes={strokes} stageSize={stageSize} />
+        <LiveLayer
+          liveLineRef={liveLineRef}
+          tool={tool}
+          color={color}
+          strokePixelWidth={strokePixelWidth}
+          previewPoints={lineTool.previewPoints}
+        />
       </Stage>
     </div>
   );
