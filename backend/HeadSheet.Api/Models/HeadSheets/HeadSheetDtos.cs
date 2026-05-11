@@ -5,7 +5,7 @@ namespace HeadSheet.Api.Models.HeadSheets;
 public record CreateHeadSheetRequestDto(
     [MaxLength(200)] string Name,
     [MaxLength(200)] string? ClientName,
-    [Required, RegularExpression("^(front|back|side)$", ErrorMessage = "templateType must be front, back, or side.")] string TemplateType,
+    [Required, RegularExpression("^(front|back|side|top)$", ErrorMessage = "templateType must be front, back, side, or top.")] string TemplateType,
     Guid? TemplateId);
 
 public record UpdateHeadSheetRequestDto(

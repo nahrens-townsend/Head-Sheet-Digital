@@ -1,4 +1,4 @@
-export type TemplateType = 'front' | 'back' | 'side'
+export type TemplateType = 'front' | 'back' | 'side' | 'top'
 
 export interface HeadSheet {
   id: string

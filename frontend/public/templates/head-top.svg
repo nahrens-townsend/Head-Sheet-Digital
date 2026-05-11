@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" width="400" height="500" fill="none">
+  <g stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Head oval (wider side-to-side than front-to-back) -->
+    <path d="M200 80c-70 0-124 52-124 120 0 68 54 120 124 120s124-52 124-120c0-68-54-120-124-120Z"/>
+    <!-- Left ear bump (semicircle) -->
+    <path d="M76 174c-12 4-20 14-20 26 0 12 8 22 20 26"/>
+    <!-- Right ear bump (semicircle) -->
+    <path d="M324 174c12 4 20 14 20 26 0 12-8 22-20 26"/>
+    <!-- Hairline circle (slightly inset, dashed) -->
+    <path d="M200 100c-58 0-104 42-104 100s46 100 104 100 104-42 104-100-46-100-104-100Z" stroke-dasharray="7 6"/>
+    <!-- Center partition line (vertical, dashed) -->
+    <path d="M200 80v240" stroke-dasharray="8 6"/>
+    <!-- Front orientation label area — small arrow pointing up (front) -->
+    <path d="M200 68l-10 18h20l-10-18Z"/>
+    <!-- Front label text marker (short tick) -->
+    <path d="M180 58h40"/>
+    <!-- Back orientation marker (tick at bottom) -->
+    <path d="M180 338h40"/>
+    <!-- Ear horizontal axis guide (dashed) -->
+    <path d="M76 200h248" stroke-dasharray="5 6"/>
+  </g>
+  <!-- Orientation labels -->
+  <text x="200" y="46" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#777" stroke="none">FRONT</text>
+  <text x="200" y="356" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#777" stroke="none">BACK</text>
+</svg>
