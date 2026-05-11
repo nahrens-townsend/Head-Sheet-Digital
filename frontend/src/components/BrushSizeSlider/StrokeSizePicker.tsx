@@ -1,11 +1,7 @@
 import type { StrokeSize } from '../../canvas/utils/canvasUtils'
 
-const STROKE_SIZE_LABELS: Record<StrokeSize, string> = {
-  sm: 'S',
-  md: 'M',
-  lg: 'L',
-  xl: 'XL',
-}
+const DOT_SIZES: Record<StrokeSize, number> = { sm: 4, md: 7, lg: 11, xl: 15 }
+const SIZE_LABELS: Record<StrokeSize, string> = { sm: 'Small', md: 'Medium', lg: 'Large', xl: 'Extra large' }
 
 const SIZES: StrokeSize[] = ['sm', 'md', 'lg', 'xl']
 
@@ -23,11 +19,20 @@ export function StrokeSizePicker({ value, onChange }: StrokeSizePickerProps) {
           type="button"
           role="radio"
           aria-checked={value === size}
-          aria-label={`Size ${STROKE_SIZE_LABELS[size]}`}
+          aria-label={SIZE_LABELS[size]}
           className={`stroke-size-picker__btn ${value === size ? 'stroke-size-picker__btn--active' : ''}`}
           onClick={() => onChange(size)}
         >
-          {STROKE_SIZE_LABELS[size]}
+          <span
+            style={{
+              display: 'block',
+              width: DOT_SIZES[size],
+              height: DOT_SIZES[size],
+              borderRadius: '50%',
+              background: 'currentColor',
+            }}
+            aria-hidden="true"
+          />
         </button>
       ))}
     </div>
