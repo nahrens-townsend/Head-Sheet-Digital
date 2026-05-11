@@ -5,8 +5,11 @@ import { StrokeSizePicker } from '../components/BrushSizeSlider/StrokeSizePicker
 interface CanvasToolbarProps {
   canUndo: boolean
   canRedo: boolean
+  canSaveTemplate: boolean
   onUndo: () => void
   onRedo: () => void
+  onExport: () => void
+  onSaveTemplate: () => void
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   sheetName: string
   onBack: () => void
@@ -22,8 +25,11 @@ const SAVE_STATUS_LABELS: Record<CanvasToolbarProps['saveStatus'], string> = {
 export function CanvasToolbar({
   canUndo,
   canRedo,
+  canSaveTemplate,
   onUndo,
   onRedo,
+  onExport,
+  onSaveTemplate,
   saveStatus,
   sheetName,
   onBack,
@@ -92,8 +98,30 @@ export function CanvasToolbar({
           onClick={() => setTool('eraser')}
           aria-label="Eraser tool"
           title="Eraser"
-        >
+          >
           ⌫
+        </button>
+
+        <span className="toolbar-sep" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="toolbar-btn"
+          onClick={onExport}
+          aria-label="Export PNG"
+          title="Export PNG"
+        >
+          ⤓
+        </button>
+        <button
+          type="button"
+          className="toolbar-btn"
+          onClick={onSaveTemplate}
+          disabled={!canSaveTemplate}
+          aria-label="Save as template"
+          title="Save as template"
+        >
+          ★
         </button>
 
         <span className="toolbar-sep" aria-hidden="true" />

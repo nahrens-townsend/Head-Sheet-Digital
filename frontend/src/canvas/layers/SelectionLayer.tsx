@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Circle, Group, Layer, Line } from 'react-konva'
 import type { CanvasObject } from '../../types/canvasObject'
 import { isLineObject } from '../../types/canvasObject'
@@ -24,6 +24,7 @@ interface SelectionLayerProps {
   zoom: number
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
   snapIndicator?: Point | null
+  isExporting?: boolean
 }
 
 function ControlHandle({
@@ -60,10 +61,17 @@ export function SelectionLayer({
   zoom,
   onUpdateObject,
   snapIndicator = null,
+  isExporting = false,
 }: SelectionLayerProps) {
   // Ref so drag callbacks always see the latest stageSize even after a window resize
   const stageSizeRef = useRef(stageSize)
-  stageSizeRef.current = stageSize
+  useEffect(() => {
+    stageSizeRef.current = stageSize
+  }, [stageSize])
+
+  if (isExporting) {
+    return null
+  }
 
   // Scale handle radius inversely with zoom so handles remain the same size on screen.
   const handleRadius = HANDLE_RADIUS / zoom

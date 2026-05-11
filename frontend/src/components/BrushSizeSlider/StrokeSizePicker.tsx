@@ -1,6 +1,6 @@
 import type { StrokeSize } from '../../canvas/utils/canvasUtils'
 
-export const STROKE_SIZE_LABELS: Record<StrokeSize, string> = {
+const STROKE_SIZE_LABELS: Record<StrokeSize, string> = {
   sm: 'S',
   md: 'M',
   lg: 'L',

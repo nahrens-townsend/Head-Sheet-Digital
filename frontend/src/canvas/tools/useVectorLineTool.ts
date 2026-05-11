@@ -8,7 +8,6 @@ import {
   createStrokeId,
   type Point,
   type StageSize,
-  type StagePointerEvent,
   type StrokeSize,
 } from '../utils/canvasUtils'
 import type { SnapFn } from '../utils/snapping'
@@ -37,7 +36,7 @@ export function useVectorLineTool({
   const [previewPoints, setPreviewPoints] = useState<number[] | null>(null)
 
   const onPointerDown = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       const raw = getStagePoint(stageRef, stageSize)
       if (!raw) return
       const { point } = snap ? snap(raw) : { point: raw }
@@ -47,7 +46,7 @@ export function useVectorLineTool({
   )
 
   const onPointerMove = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!previewPoints) return
       const raw = getStagePoint(stageRef, stageSize)
       if (!raw) return
@@ -58,7 +57,7 @@ export function useVectorLineTool({
   )
 
   const onPointerUp = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!previewPoints) return
 
       const raw = getStagePoint(stageRef, stageSize)

@@ -4,10 +4,11 @@ import { useCanvasStore } from '../stores/canvasStore'
 import type { CanvasData } from '../types/canvasObject'
 import { parseCanvasData } from '../types/canvasObject'
 
-export function useAutoSave(
+export function useAutoSave<TSaveResult extends { updatedAt: string }>(
   headSheetId: string,
   canvasData: CanvasData,
-  saveFn: (data: CanvasData) => Promise<void>,
+  saveFn: (data: CanvasData) => Promise<TSaveResult>,
+  afterSave?: (saveResult: TSaveResult) => Promise<void> | void,
   // Server-provided JSON for the current sheet. Used to seed the baseline so
   // loading a sheet doesn't immediately trigger a phantom save.
   initialStrokesJson?: string,
@@ -18,9 +19,13 @@ export function useAutoSave(
   const lastSavedRef = useRef<string | null>(null)
   const saveSeqRef = useRef(0)
   const saveFnRef = useRef(saveFn)
+  const afterSaveRef = useRef(afterSave)
   useEffect(() => {
     saveFnRef.current = saveFn
   }, [saveFn])
+  useEffect(() => {
+    afterSaveRef.current = afterSave
+  }, [afterSave])
 
   useEffect(() => {
     lastSavedRef.current = null
@@ -45,10 +50,18 @@ export function useAutoSave(
     const persist = async () => {
       setSaveStatus('saving')
       try {
-        await saveFnRef.current(JSON.parse(debouncedData) as CanvasData)
+        const parsedData = JSON.parse(debouncedData) as CanvasData
+        const saveResult = await saveFnRef.current(parsedData)
         if (seq === saveSeqRef.current) {
           lastSavedRef.current = debouncedData
           setSaveStatus('saved')
+        }
+        if (seq === saveSeqRef.current && afterSaveRef.current) {
+          try {
+            await afterSaveRef.current(saveResult)
+          } catch (error) {
+            console.error('After-save hook failed.', error)
+          }
         }
       } catch {
         if (seq === saveSeqRef.current) {

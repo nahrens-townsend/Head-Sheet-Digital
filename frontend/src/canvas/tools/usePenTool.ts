@@ -7,7 +7,6 @@ import {
   normalizePoints,
   createStrokeId,
   type StageSize,
-  type StagePointerEvent,
   type StrokeSize,
 } from '../utils/canvasUtils'
 
@@ -32,7 +31,7 @@ export function usePenTool({
   const currentPointsRef = useRef<number[]>([])
 
   const onPointerDown = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       const point = getStagePoint(stageRef, stageSize)
       if (!point) {
         return
@@ -47,7 +46,7 @@ export function usePenTool({
   )
 
   const onPointerMove = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!isDrawingRef.current) {
         return
       }
@@ -69,7 +68,7 @@ export function usePenTool({
   )
 
   const onPointerUp = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!isDrawingRef.current || currentPointsRef.current.length < 2) {
         isDrawingRef.current = false
         currentPointsRef.current = []
