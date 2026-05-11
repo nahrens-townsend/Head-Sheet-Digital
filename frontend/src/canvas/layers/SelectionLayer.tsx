@@ -347,6 +347,12 @@ export function SelectionLayer({
                   const dy = ptr.y - ref.pointerStart.y
                   ref.lastDx = dx
                   ref.lastDy = dy
+                  // Update snap indicator during body drag — mirror the start-priority/end-fallback
+                  // logic used at onDragEnd so the indicator reflects which endpoint would actually snap.
+                  const bsStart = snap?.({ x: ref.snapStart.x + dx, y: ref.snapStart.y + dy }, obj.id)
+                  if (!bsStart?.snapped) {
+                    snap?.({ x: ref.snapEnd.x + dx, y: ref.snapEnd.y + dy }, obj.id)
+                  }
                   setDraftState({
                     kind: 'line',
                     id: obj.id,
@@ -430,15 +436,20 @@ export function SelectionLayer({
                 radius={handleRadius}
                 zoom={zoom}
                 onDragMove={(p) => {
-                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: p, mid: newMid, end: cEnd })
+                  const sr = snap?.(p, obj.id)
+                  const sp = sr?.point ?? p
+                  const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: sp, mid: newMid, end: cEnd })
                 }}
                 onDragEnd={(p) => {
-                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
+                  const sr = snap?.(p, obj.id)
+                  const sp = sr?.point ?? p
+                  clearSnap?.()
+                  const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
                   const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, start: normalizePoint(p, ss), mid: normalizePoint(newMid, ss) }
+                      ? { ...o, start: normalizePoint(sp, ss), mid: normalizePoint(newMid, ss) }
                       : o,
                   )
                   setDraftState(null)
@@ -469,15 +480,20 @@ export function SelectionLayer({
                 radius={handleRadius}
                 zoom={zoom}
                 onDragMove={(p) => {
-                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: p })
+                  const sr = snap?.(p, obj.id)
+                  const ep = sr?.point ?? p
+                  const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: ep })
                 }}
                 onDragEnd={(p) => {
-                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
+                  const sr = snap?.(p, obj.id)
+                  const ep = sr?.point ?? p
+                  clearSnap?.()
+                  const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
                   const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(p, ss) }
+                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(ep, ss) }
                       : o,
                   )
                   setDraftState(null)
