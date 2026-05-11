@@ -134,6 +134,7 @@ function ControlHandle({
   y,
   radius,
   zoom,
+  onDragStart,
   onDragMove,
   onDragEnd,
 }: {
@@ -141,6 +142,7 @@ function ControlHandle({
   y: number
   radius: number
   zoom: number
+  onDragStart?: () => void
   onDragMove: (p: Point) => void
   onDragEnd: (p: Point) => void
 }) {
@@ -153,6 +155,7 @@ function ControlHandle({
       stroke={HANDLE_STROKE}
       strokeWidth={2 / zoom}
       draggable
+      onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove({ x: e.target.x(), y: e.target.y() })}
       onDragEnd={(e) => onDragEnd({ x: e.target.x(), y: e.target.y() })}
     />
@@ -171,6 +174,8 @@ interface SelectionLayerProps {
   snap?: SnapFn
   clearSnap?: () => void
   isExporting?: boolean
+  onDraftStart?: (id: string) => void
+  onDraftEnd?: () => void
 }
 
 export function SelectionLayer({
@@ -183,6 +188,8 @@ export function SelectionLayer({
   snap,
   clearSnap,
   isExporting = false,
+  onDraftStart,
+  onDraftEnd,
 }: SelectionLayerProps) {
   // Ref so drag callbacks always see the latest stageSize even after a window resize
   const stageSizeRef = useRef(stageSize)
@@ -190,10 +197,26 @@ export function SelectionLayer({
     stageSizeRef.current = stageSize
   }, [stageSize])
 
+  // Keep refs to draft state and onDraftEnd so the unmount cleanup can safely call it.
+  const onDraftEndRef = useRef(onDraftEnd)
+  useEffect(() => { onDraftEndRef.current = onDraftEnd }, [onDraftEnd])
+  const draftActiveRef = useRef(false)
+
   // Pixel-space draft positions for live visual feedback during any drag
   const [draftState, setDraftState] = useState<DraftState>(null)
   // Snapshot captured at body-drag start (does not drive renders)
   const bodyDragRef = useRef<BodyDragSnap>(null)
+
+  // Track whether a draft is currently active (used by unmount cleanup).
+  useEffect(() => { draftActiveRef.current = draftState !== null }, [draftState])
+
+  // If this component unmounts while a drag is in progress, clear the parent's
+  // editingObjectId so ObjectsLayer does not permanently hide the object.
+  useEffect(() => {
+    return () => {
+      if (draftActiveRef.current) onDraftEndRef.current?.()
+    }
+  }, [])
 
   if (isExporting) {
     return null
@@ -247,6 +270,7 @@ export function SelectionLayer({
                 onDragStart={(e) => {
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
                   if (!ptr) return
+                  onDraftStart?.(obj.id)
                   bodyDragRef.current = {
                     kind: 'pen',
                     id: obj.id,
@@ -276,6 +300,7 @@ export function SelectionLayer({
                   bodyDragRef.current = null
                   if (!ref || ref.kind !== 'pen' || ref.id !== obj.id) {
                     setDraftState(null)
+                    onDraftEnd?.()
                     return
                   }
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
@@ -288,6 +313,7 @@ export function SelectionLayer({
                     o.type === 'pen' ? { ...o, points: normalizePoints(newPts, ss) } : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
             </Group>
@@ -327,6 +353,7 @@ export function SelectionLayer({
                 onDragStart={(e) => {
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
                   if (!ptr) return
+                  onDraftStart?.(obj.id)
                   bodyDragRef.current = {
                     kind: 'line',
                     id: obj.id,
@@ -366,6 +393,7 @@ export function SelectionLayer({
                   bodyDragRef.current = null
                   if (!ref || ref.kind !== 'line' || ref.id !== obj.id) {
                     setDraftState(null)
+                    onDraftEnd?.()
                     return
                   }
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
@@ -407,6 +435,7 @@ export function SelectionLayer({
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
 
@@ -435,6 +464,7 @@ export function SelectionLayer({
                 y={cStart.y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
                   const sr = snap?.(p, obj.id)
                   const sp = sr?.point ?? p
@@ -453,6 +483,7 @@ export function SelectionLayer({
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
               <ControlHandle
@@ -460,6 +491,7 @@ export function SelectionLayer({
                 y={onCurveAtHalf(dStart, dMid, dEnd).y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
                   const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
                   setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: ctrl, end: cEnd })
@@ -472,6 +504,7 @@ export function SelectionLayer({
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
               <ControlHandle
@@ -479,6 +512,7 @@ export function SelectionLayer({
                 y={cEnd.y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
                   const sr = snap?.(p, obj.id)
                   const ep = sr?.point ?? p
@@ -497,6 +531,7 @@ export function SelectionLayer({
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
             </Group>

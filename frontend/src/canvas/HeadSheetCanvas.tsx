@@ -48,6 +48,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
   const exportQueueRef = useRef(Promise.resolve() as Promise<void>)
   const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset } =
     useCanvasStore();
@@ -262,6 +263,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     };
   }, [setZoom, setPanOffset]); // stable Zustand setters; zoom/pan reads use refs
 
+  // Clear any in-progress edit when switching away from select tool or during export.
+  // Prevents the object from staying hidden if the drag is interrupted before onDragEnd fires.
+  useEffect(() => {
+    if (isExporting || tool !== 'select') setEditingObjectId(null);
+  }, [isExporting, tool]);
+
   const templateRect = useMemo<TemplateRect | null>(() => {
     if (!templateImage) {
       return null;
@@ -403,7 +410,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           templateImage={templateImage}
           templateRect={templateRect}
         />
-        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} />
+        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} hiddenObjectIds={editingObjectId ? new Set([editingObjectId]) : undefined} />
         <LiveLayer
           liveLineRef={liveLineRef}
           tool={tool}
@@ -422,6 +429,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           snap={snap}
           clearSnap={clearSnap}
           isExporting={isExporting}
+          onDraftStart={setEditingObjectId}
+          onDraftEnd={() => setEditingObjectId(null)}
         />
       </Stage>
     </div>
