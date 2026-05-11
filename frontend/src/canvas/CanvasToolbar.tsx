@@ -1,4 +1,6 @@
 import { useCanvasStore } from '../stores/canvasStore'
+import { ColorPicker } from '../components/ColorPicker/ColorPicker'
+import { StrokeSizePicker } from '../components/BrushSizeSlider/StrokeSizePicker'
 
 interface CanvasToolbarProps {
   canUndo: boolean
@@ -26,7 +28,7 @@ export function CanvasToolbar({
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
-  const { tool, color, brushSize, setTool, setColor, setBrushSize } = useCanvasStore()
+  const { tool, color, strokeSize, setTool, setColor, setStrokeSize } = useCanvasStore()
 
   return (
     <div className="canvas-toolbar">
@@ -69,25 +71,9 @@ export function CanvasToolbar({
 
         <span className="toolbar-sep" aria-hidden="true" />
 
-        <input
-          type="color"
-          className="toolbar-color"
-          value={color}
-          onChange={(event) => setColor(event.target.value)}
-          aria-label="Brush color"
-          title="Brush color"
-        />
+        <ColorPicker value={color} onChange={setColor} />
 
-        <input
-          type="range"
-          min={1}
-          max={20}
-          className="toolbar-size"
-          value={brushSize}
-          onChange={(event) => setBrushSize(Number(event.target.value))}
-          aria-label="Brush size"
-          title="Brush size"
-        />
+        <StrokeSizePicker value={strokeSize} onChange={setStrokeSize} />
 
         <span className="toolbar-sep" aria-hidden="true" />
 
