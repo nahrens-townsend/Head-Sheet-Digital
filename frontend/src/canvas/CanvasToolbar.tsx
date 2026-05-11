@@ -70,6 +70,24 @@ export function CanvasToolbar({
         </button>
         <button
           type="button"
+          className={`toolbar-btn ${tool === 'arrow' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('arrow')}
+          aria-label="Arrow tool"
+          title="Arrow"
+        >
+          →
+        </button>
+        <button
+          type="button"
+          className={`toolbar-btn ${tool === 'dotted' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('dotted')}
+          aria-label="Dotted line tool"
+          title="Dotted line"
+        >
+          ⋯
+        </button>
+        <button
+          type="button"
           className={`toolbar-btn ${tool === 'eraser' ? 'toolbar-btn--active' : ''}`}
           onClick={() => setTool('eraser')}
           aria-label="Eraser tool"

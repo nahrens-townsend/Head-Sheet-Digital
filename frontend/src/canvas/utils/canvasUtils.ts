@@ -36,7 +36,9 @@ export function getStagePoint(
   stageSize: StageSize,
 ): Point | null {
   const stage = stageRef.current
-  const point = stage?.getPointerPosition()
+  // getRelativePointerPosition accounts for stage scaleX/scaleY and x/y (zoom + pan),
+  // returning the pointer position in canvas content-space rather than screen-space.
+  const point = stage?.getRelativePointerPosition()
 
   if (!stage || !point || stageSize.width <= 0 || stageSize.height <= 0) {
     return null
