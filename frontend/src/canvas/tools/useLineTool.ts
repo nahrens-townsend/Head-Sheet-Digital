@@ -1,12 +1,11 @@
 import { useCallback, useState } from 'react'
 import type React from 'react'
 import Konva from 'konva'
-import type { Stroke } from '../../types/stroke'
+import type { LineObject } from '../../types/canvasObject'
 import {
   getStagePoint,
-  normalizePoints,
+  normalizePoint,
   createStrokeId,
-  STROKE_SIZES,
   type StageSize,
   type StagePointerEvent,
   type StrokeSize,
@@ -17,7 +16,7 @@ interface UseLineToolOptions {
   stageSize: StageSize
   color: string
   strokeSize: StrokeSize
-  onStrokeComplete: (stroke: Stroke) => void
+  onObjectComplete: (object: LineObject) => void
 }
 
 export function useLineTool({
@@ -25,7 +24,7 @@ export function useLineTool({
   stageSize,
   color,
   strokeSize,
-  onStrokeComplete,
+  onObjectComplete,
 }: UseLineToolOptions) {
   const [previewPoints, setPreviewPoints] = useState<number[] | null>(null)
 
@@ -64,26 +63,29 @@ export function useLineTool({
       }
 
       const point = getStagePoint(stageRef, stageSize)
-      const finalPoints = point
-        ? [previewPoints[0], previewPoints[1], point.x, point.y]
-        : previewPoints
+      const [px0 = 0, py0 = 0] = previewPoints
+      const endX = point ? point.x : (previewPoints[2] ?? px0)
+      const endY = point ? point.y : (previewPoints[3] ?? py0)
 
-      onStrokeComplete({
+      const startPx = { x: px0, y: py0 }
+      const endPx = { x: endX, y: endY }
+      const midPx = { x: (px0 + endX) / 2, y: (py0 + endY) / 2 }
+
+      onObjectComplete({
+        type: 'line',
         id: createStrokeId(),
-        tool: 'line',
         color,
-        width: STROKE_SIZES[strokeSize],
+        width: strokeSize,
         opacity: 1,
-        points: normalizePoints(finalPoints, stageSize),
-        tension: 0,
-        lineCap: 'round',
-        lineJoin: 'round',
+        start: normalizePoint(startPx, stageSize),
+        mid: normalizePoint(midPx, stageSize),
+        end: normalizePoint(endPx, stageSize),
         createdAt: new Date().toISOString(),
       })
 
       setPreviewPoints(null)
     },
-    [strokeSize, color, onStrokeComplete, previewPoints, stageRef, stageSize],
+    [strokeSize, color, onObjectComplete, previewPoints, stageRef, stageSize],
   )
 
   return {

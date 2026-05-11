@@ -5,17 +5,8 @@ import { HeadSheetCanvas } from '../../canvas/HeadSheetCanvas'
 import { useAutoSave } from '../../canvas/useAutoSave'
 import { useCanvasHistory } from '../../canvas/useCanvasHistory'
 import { useCanvasStore } from '../../stores/canvasStore'
-import type { Stroke } from '../../types/stroke'
+import { parseCanvasData } from '../../types/canvasObject'
 import { useGetHeadSheet, useSaveStrokes } from './useHeadSheets'
-
-function parseStrokes(strokesJson: string): Stroke[] {
-  try {
-    const parsed = JSON.parse(strokesJson) as unknown
-    return Array.isArray(parsed) ? (parsed as Stroke[]) : []
-  } catch {
-    return []
-  }
-}
 
 export function HeadSheetEditor() {
   const { id } = useParams<{ id: string }>()
@@ -23,7 +14,7 @@ export function HeadSheetEditor() {
   const sheetId = id ?? ''
   const initializedSheetIdRef = useRef<string | null>(null)
   const { data, isLoading, isError } = useGetHeadSheet(sheetId)
-  const { addStroke, undo, redo, canUndo, canRedo, strokes, setStrokes } = useCanvasHistory()
+  const { addObject, undo, redo, canUndo, canRedo, objects, setObjects } = useCanvasHistory()
   const saveStatus = useCanvasStore((state) => state.saveStatus)
   const saveMutation = useSaveStrokes(sheetId)
 
@@ -37,12 +28,12 @@ export function HeadSheetEditor() {
       return
     }
 
-    setStrokes(parseStrokes(sheet.strokesJson))
+    setObjects(parseCanvasData(sheet.strokesJson).objects)
     initializedSheetIdRef.current = sheet.id
-  }, [data?.data, setStrokes])
+  }, [data?.data, setObjects])
 
-  useAutoSave(sheetId, strokes, async (nextStrokes) => {
-    await saveMutation.mutateAsync(nextStrokes)
+  useAutoSave(sheetId, { version: 2, objects }, async (canvasData) => {
+    await saveMutation.mutateAsync(canvasData)
   }, data?.data?.strokesJson)
 
   useEffect(() => {
@@ -87,9 +78,9 @@ export function HeadSheetEditor() {
       />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
-          strokes={strokes}
+          objects={objects}
           templateType={sheet.templateType}
-          onStrokeComplete={addStroke}
+          onObjectComplete={addObject}
         />
       </div>
     </div>

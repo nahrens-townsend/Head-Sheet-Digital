@@ -1,12 +1,11 @@
 import { useCallback, useRef } from 'react'
 import type React from 'react'
 import Konva from 'konva'
-import type { Stroke } from '../../types/stroke'
+import type { EraserStrokeObject } from '../../types/canvasObject'
 import {
   getStagePoint,
   normalizePoints,
   createStrokeId,
-  STROKE_SIZES,
   type StageSize,
   type StagePointerEvent,
   type StrokeSize,
@@ -17,7 +16,7 @@ interface UseEraserToolOptions {
   liveLineRef: React.RefObject<Konva.Line | null>
   stageSize: StageSize
   strokeSize: StrokeSize
-  onStrokeComplete: (stroke: Stroke) => void
+  onObjectComplete: (object: EraserStrokeObject) => void
 }
 
 export function useEraserTool({
@@ -25,7 +24,7 @@ export function useEraserTool({
   liveLineRef,
   stageSize,
   strokeSize,
-  onStrokeComplete,
+  onObjectComplete,
 }: UseEraserToolOptions) {
   const isDrawingRef = useRef(false)
   const currentPointsRef = useRef<number[]>([])
@@ -82,16 +81,14 @@ export function useEraserTool({
           ? [...currentPointsRef.current, ...currentPointsRef.current]
           : currentPointsRef.current
 
-      onStrokeComplete({
+      onObjectComplete({
+        type: 'eraser',
         id: createStrokeId(),
-        tool: 'eraser',
         color: '#ffffff',
-        width: STROKE_SIZES[strokeSize] * 2,
+        width: strokeSize,
         opacity: 1,
         points: normalizePoints(points, stageSize),
         tension: 0.35,
-        lineCap: 'round',
-        lineJoin: 'round',
         createdAt: new Date().toISOString(),
       })
 
@@ -100,7 +97,7 @@ export function useEraserTool({
       liveLineRef.current?.points([])
       liveLineRef.current?.getLayer()?.batchDraw()
     },
-    [strokeSize, liveLineRef, onStrokeComplete, stageSize],
+    [strokeSize, liveLineRef, onObjectComplete, stageSize],
   )
 
   return {
