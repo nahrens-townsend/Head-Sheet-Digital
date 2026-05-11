@@ -480,11 +480,7 @@ code {
   touch-action: none;
 }
 
-.head-sheet-canvas .konvajs-content,
-.head-sheet-canvas canvas {
-  width: 100% !important;
-  height: 100% !important;
-}
+
 
 .editor {
   position: fixed;
