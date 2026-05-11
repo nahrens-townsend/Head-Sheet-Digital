@@ -1,5 +1,6 @@
 using System.Text;
 using HeadSheet.Application.Auth;
+using HeadSheet.Application.HeadSheets;
 using HeadSheet.Application.Interfaces;
 using HeadSheet.Infrastructure.Auth;
 using HeadSheet.Infrastructure.Persistence;
@@ -21,6 +22,9 @@ builder.Services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbConte
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Head sheet services
+builder.Services.AddScoped<IHeadSheetService, HeadSheetService>();
 
 // JWT authentication
 var jwtSecret = builder.Configuration["Jwt:Secret"]
