@@ -1,6 +1,6 @@
 import type React from 'react'
 import Konva from 'konva'
-import { Layer, Line, Arrow } from 'react-konva'
+import { Layer, Line, Shape } from 'react-konva'
 import type { ToolType } from '../../types/stroke'
 
 interface LiveLayerProps {
@@ -75,10 +75,9 @@ export function LiveLayer({
         />
       )}
 
-      {/* Arrow preview — uses Konva's built-in Arrow for straight-line draw gesture */}
+      {/* Arrow preview — custom Shape matching ObjectsLayer arrowhead fix (bezier stops at base) */}
       {previewPoints && tool === 'arrow' && (
-        <Arrow
-          points={previewPoints}
+        <Shape
           stroke={color}
           fill={color}
           strokeWidth={strokePixelWidth}
@@ -86,8 +85,41 @@ export function LiveLayer({
           lineCap="round"
           lineJoin="round"
           strokeScaleEnabled={false}
-          pointerLength={Math.max(strokePixelWidth * 3.5, 10)}
-          pointerWidth={Math.max(strokePixelWidth * 2, 7)}
+          sceneFunc={(ctx, shape) => {
+            const sx = previewPoints[0] ?? 0
+            const sy = previewPoints[1] ?? 0
+            const ex = previewPoints[2] ?? sx
+            const ey = previewPoints[3] ?? sy
+            // During live preview mid is the geometric centre (straight-line equivalent)
+            const mx = (sx + ex) / 2
+            const my = (sy + ey) / 2
+            const dx = ex - mx
+            const dy = ey - my
+            const len = Math.hypot(dx, dy)
+            if (len === 0) return
+
+            const arrowLen = Math.max(strokePixelWidth * 3.5, 10)
+            const arrowWid = Math.max(strokePixelWidth * 2, 7)
+            const cappedArrowLen = Math.min(arrowLen, len / 2)
+            const ux = dx / len
+            const uy = dy / len
+            const bx = ex - cappedArrowLen * ux
+            const by = ey - cappedArrowLen * uy
+
+            ctx.beginPath()
+            ctx.moveTo(sx, sy)
+            ctx.quadraticCurveTo(mx, my, bx, by)
+            ctx.strokeShape(shape)
+
+            const px = -uy
+            const py = ux
+            ctx.beginPath()
+            ctx.moveTo(ex, ey)
+            ctx.lineTo(bx + (arrowWid / 2) * px, by + (arrowWid / 2) * py)
+            ctx.lineTo(bx - (arrowWid / 2) * px, by - (arrowWid / 2) * py)
+            ctx.closePath()
+            ctx.fillShape(shape)
+          }}
         />
       )}
     </Layer>

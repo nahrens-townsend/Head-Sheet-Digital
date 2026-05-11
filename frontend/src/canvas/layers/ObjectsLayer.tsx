@@ -151,34 +151,37 @@ export const ObjectsLayer = memo(function ObjectsLayer({
                 lineJoin="round"
                 strokeScaleEnabled={false}
                 sceneFunc={(ctx, shape) => {
-                  // Draw the bezier curve
-                  ctx.beginPath()
-                  ctx.moveTo(start.x, start.y)
-                  ctx.quadraticCurveTo(mid.x, mid.y, end.x, end.y)
-                  ctx.strokeShape(shape)
-
-                  // Draw arrowhead at end, oriented along the bezier tangent at t=1
-                  // Tangent direction at t=1: B'(1) ∝ (end - mid)
+                  // Tangent at t=1: B'(1) ∝ (end - mid)
                   const dx = end.x - mid.x
                   const dy = end.y - mid.y
                   const len = Math.hypot(dx, dy)
-                  if (len > 0) {
-                    const arrowLen = Math.max(strokeWidth * 3.5, 10)
-                    const arrowWid = Math.max(strokeWidth * 2, 7)
-                    const ux = dx / len
-                    const uy = dy / len
-                    // Perpendicular
-                    const px = -uy
-                    const py = ux
-                    const bx = end.x - arrowLen * ux
-                    const by = end.y - arrowLen * uy
-                    ctx.beginPath()
-                    ctx.moveTo(end.x, end.y)
-                    ctx.lineTo(bx + (arrowWid / 2) * px, by + (arrowWid / 2) * py)
-                    ctx.lineTo(bx - (arrowWid / 2) * px, by - (arrowWid / 2) * py)
-                    ctx.closePath()
-                    ctx.fillShape(shape)
-                  }
+                  if (len === 0) return
+
+                  const arrowLen = Math.max(strokeWidth * 3.5, 10)
+                  const arrowWid = Math.max(strokeWidth * 2, 7)
+                  // Cap arrowhead on very short lines so it doesn't overshoot start
+                  const cappedArrowLen = Math.min(arrowLen, len / 2)
+                  const ux = dx / len
+                  const uy = dy / len
+                  // arrowBase: where the bezier stroke terminates — base of the triangle
+                  const bx = end.x - cappedArrowLen * ux
+                  const by = end.y - cappedArrowLen * uy
+
+                  // Bezier stops at arrowBase so the stroke doesn't poke through the tip
+                  ctx.beginPath()
+                  ctx.moveTo(start.x, start.y)
+                  ctx.quadraticCurveTo(mid.x, mid.y, bx, by)
+                  ctx.strokeShape(shape)
+
+                  // Filled arrowhead triangle
+                  const px = -uy
+                  const py = ux
+                  ctx.beginPath()
+                  ctx.moveTo(end.x, end.y)
+                  ctx.lineTo(bx + (arrowWid / 2) * px, by + (arrowWid / 2) * py)
+                  ctx.lineTo(bx - (arrowWid / 2) * px, by - (arrowWid / 2) * py)
+                  ctx.closePath()
+                  ctx.fillShape(shape)
                 }}
               />
             )
