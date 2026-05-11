@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
-import type { Stroke } from '../types/stroke'
+import type { CanvasObject } from '../types/canvasObject'
 
 interface CanvasHistoryState {
-  past: Stroke[][]
-  present: Stroke[]
-  future: Stroke[][]
+  past: CanvasObject[][]
+  present: CanvasObject[]
+  future: CanvasObject[][]
 }
 
 const MAX_HISTORY_ENTRIES = 50
@@ -16,10 +16,10 @@ export function useCanvasHistory() {
     future: [],
   })
 
-  const addStroke = useCallback((stroke: Stroke) => {
+  const addObject = useCallback((object: CanvasObject) => {
     setHistory((current) => ({
       past: [...current.past, current.present].slice(-MAX_HISTORY_ENTRIES),
-      present: [...current.present, stroke],
+      present: [...current.present, object],
       future: [],
     }))
   }, [])
@@ -56,10 +56,10 @@ export function useCanvasHistory() {
     })
   }, [])
 
-  const setStrokes = useCallback((strokes: Stroke[]) => {
+  const setObjects = useCallback((objects: CanvasObject[]) => {
     setHistory({
       past: [],
-      present: strokes,
+      present: objects,
       future: [],
     })
   }, [])
@@ -68,12 +68,12 @@ export function useCanvasHistory() {
   const canRedo = useMemo(() => history.future.length > 0, [history.future.length])
 
   return {
-    strokes: history.present,
+    objects: history.present,
     canUndo,
     canRedo,
-    addStroke,
+    addObject,
     undo,
     redo,
-    setStrokes,
+    setObjects,
   }
 }

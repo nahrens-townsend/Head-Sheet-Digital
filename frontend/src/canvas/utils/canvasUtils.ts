@@ -60,6 +60,14 @@ export function denormalizePoints(points: number[], stageSize: StageSize): numbe
   )
 }
 
+export function normalizePoint(p: Point, stageSize: StageSize): Point {
+  return { x: p.x / stageSize.width, y: p.y / stageSize.height }
+}
+
+export function denormalizePoint(p: Point, stageSize: StageSize): Point {
+  return { x: p.x * stageSize.width, y: p.y * stageSize.height }
+}
+
 export function createStrokeId(): string {
   return typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()

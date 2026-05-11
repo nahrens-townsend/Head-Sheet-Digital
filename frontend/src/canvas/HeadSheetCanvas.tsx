@@ -3,7 +3,7 @@ import Konva from 'konva';
 import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
 import type { TemplateType } from '../types/headSheet';
-import type { Stroke } from '../types/stroke';
+import type { CanvasObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
 import { usePenTool } from './tools/usePenTool';
@@ -13,14 +13,14 @@ import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 
 interface HeadSheetCanvasProps {
-  strokes: Stroke[];
+  objects: CanvasObject[];
   templateType: TemplateType;
-  onStrokeComplete: (stroke: Stroke) => void;
+  onObjectComplete: (object: CanvasObject) => void;
 }
 
 type TemplateRect = { x: number; y: number; width: number; height: number };
 
-export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: HeadSheetCanvasProps) {
+export function HeadSheetCanvas({ objects, templateType, onObjectComplete }: HeadSheetCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<Konva.Stage | null>(null);
   const liveLineRef = useRef<Konva.Line | null>(null);
@@ -105,7 +105,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     stageSize,
     color,
     strokeSize,
-    onStrokeComplete,
+    onObjectComplete,
   });
 
   const lineTool = useLineTool({
@@ -113,7 +113,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     stageSize,
     color,
     strokeSize,
-    onStrokeComplete,
+    onObjectComplete,
   });
 
   const eraserTool = useEraserTool({
@@ -121,7 +121,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
     liveLineRef,
     stageSize,
     strokeSize,
-    onStrokeComplete,
+    onObjectComplete,
   });
 
   const pointerHandlers = useMemo(() => {
@@ -152,7 +152,7 @@ export function HeadSheetCanvas({ strokes, templateType, onStrokeComplete }: Hea
           templateImage={templateImage}
           templateRect={templateRect}
         />
-        <ObjectsLayer strokes={strokes} stageSize={stageSize} />
+        <ObjectsLayer objects={objects} stageSize={stageSize} />
         <LiveLayer
           liveLineRef={liveLineRef}
           tool={tool}
