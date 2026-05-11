@@ -1,108 +1,78 @@
 import { useCallback, useRef } from 'react'
 import type React from 'react'
 import Konva from 'konva'
-import type { EraserStrokeObject } from '../../types/canvasObject'
+import type { CanvasObject } from '../../types/canvasObject'
 import {
   getStagePoint,
-  normalizePoints,
-  createStrokeId,
   type StageSize,
   type StagePointerEvent,
-  type StrokeSize,
 } from '../utils/canvasUtils'
+import { hitTestCanvasObject, eraserThreshold } from '../utils/hitTest'
 
 interface UseEraserToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
-  liveLineRef: React.RefObject<Konva.Line | null>
   stageSize: StageSize
-  strokeSize: StrokeSize
-  onObjectComplete: (object: EraserStrokeObject) => void
+  objects: CanvasObject[]
+  onDeleteObjects: (ids: string[]) => void
 }
 
 export function useEraserTool({
   stageRef,
-  liveLineRef,
   stageSize,
-  strokeSize,
-  onObjectComplete,
+  objects,
+  onDeleteObjects,
 }: UseEraserToolOptions) {
-  const isDrawingRef = useRef(false)
-  const currentPointsRef = useRef<number[]>([])
+  const isActiveRef = useRef(false)
+  // IDs collected during the current gesture — committed as one undo entry on pointerUp
+  const pendingRef = useRef<Set<string>>(new Set())
+
+  const collectHits = useCallback(
+    (px: { x: number; y: number }) => {
+      objects
+        .filter(
+          (obj) =>
+            // never delete legacy raster-eraser masks (destination-out objects)
+            obj.type !== 'eraser' &&
+            !pendingRef.current.has(obj.id) &&
+            hitTestCanvasObject(obj, px, stageSize, eraserThreshold(obj)),
+        )
+        .forEach((obj) => pendingRef.current.add(obj.id))
+    },
+    [objects, stageSize],
+  )
 
   const onPointerDown = useCallback(
     (_event: StagePointerEvent) => {
-      const point = getStagePoint(stageRef, stageSize)
-      if (!point) {
-        return
-      }
-
-      isDrawingRef.current = true
-      currentPointsRef.current = [point.x, point.y]
-      liveLineRef.current?.points(currentPointsRef.current)
-      liveLineRef.current?.getLayer()?.batchDraw()
+      const px = getStagePoint(stageRef, stageSize)
+      if (!px) return
+      isActiveRef.current = true
+      pendingRef.current = new Set()
+      collectHits(px)
     },
-    [liveLineRef, stageRef, stageSize],
+    [collectHits, stageRef, stageSize],
   )
 
   const onPointerMove = useCallback(
     (_event: StagePointerEvent) => {
-      if (!isDrawingRef.current) {
-        return
-      }
-
-      if (!liveLineRef.current) {
-        return
-      }
-
-      const point = getStagePoint(stageRef, stageSize)
-      if (!point) {
-        return
-      }
-
-      currentPointsRef.current.push(point.x, point.y)
-      liveLineRef.current.points(currentPointsRef.current)
-      liveLineRef.current.getLayer()?.batchDraw()
+      if (!isActiveRef.current) return
+      const px = getStagePoint(stageRef, stageSize)
+      if (!px) return
+      collectHits(px)
     },
-    [liveLineRef, stageRef, stageSize],
+    [collectHits, stageRef, stageSize],
   )
 
+  // Commit the whole gesture as a single undo step on pointer-up
   const onPointerUp = useCallback(
     (_event: StagePointerEvent) => {
-      if (!isDrawingRef.current || currentPointsRef.current.length < 2) {
-        isDrawingRef.current = false
-        currentPointsRef.current = []
-        liveLineRef.current?.points([])
-        liveLineRef.current?.getLayer()?.batchDraw()
-        return
-      }
-
-      const points =
-        currentPointsRef.current.length === 2
-          ? [...currentPointsRef.current, ...currentPointsRef.current]
-          : currentPointsRef.current
-
-      onObjectComplete({
-        type: 'eraser',
-        id: createStrokeId(),
-        color: '#ffffff',
-        width: strokeSize,
-        opacity: 1,
-        points: normalizePoints(points, stageSize),
-        tension: 0.35,
-        createdAt: new Date().toISOString(),
-      })
-
-      isDrawingRef.current = false
-      currentPointsRef.current = []
-      liveLineRef.current?.points([])
-      liveLineRef.current?.getLayer()?.batchDraw()
+      isActiveRef.current = false
+      const ids = [...pendingRef.current]
+      pendingRef.current = new Set()
+      if (ids.length > 0) onDeleteObjects(ids)
     },
-    [strokeSize, liveLineRef, onObjectComplete, stageSize],
+    [onDeleteObjects],
   )
 
-  return {
-    onPointerDown,
-    onPointerMove,
-    onPointerUp,
-  }
+  return { onPointerDown, onPointerMove, onPointerUp }
 }
+

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { CanvasToolbar } from '../../canvas/CanvasToolbar'
 import { HeadSheetCanvas } from '../../canvas/HeadSheetCanvas'
+import { SelectionPanel } from '../../canvas/SelectionPanel'
 import { useAutoSave } from '../../canvas/useAutoSave'
 import { useCanvasHistory } from '../../canvas/useCanvasHistory'
 import { useCanvasStore } from '../../stores/canvasStore'
@@ -14,7 +15,8 @@ export function HeadSheetEditor() {
   const sheetId = id ?? ''
   const initializedSheetIdRef = useRef<string | null>(null)
   const { data, isLoading, isError } = useGetHeadSheet(sheetId)
-  const { addObject, undo, redo, canUndo, canRedo, objects, setObjects } = useCanvasHistory()
+  const { addObject, updateObject, deleteObjects, undo, redo, canUndo, canRedo, objects, setObjects } =
+    useCanvasHistory()
   const saveStatus = useCanvasStore((state) => state.saveStatus)
   const saveMutation = useSaveStrokes(sheetId)
 
@@ -81,6 +83,14 @@ export function HeadSheetEditor() {
           objects={objects}
           templateType={sheet.templateType}
           onObjectComplete={addObject}
+          onUpdateObject={updateObject}
+          onDeleteObjects={deleteObjects}
+        />
+        <SelectionPanel
+          objects={objects}
+          onUpdateObject={updateObject}
+          onDeleteObjects={deleteObjects}
+          onDuplicateObject={addObject}
         />
       </div>
     </div>

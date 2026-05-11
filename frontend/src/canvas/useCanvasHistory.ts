@@ -24,6 +24,38 @@ export function useCanvasHistory() {
     }))
   }, [])
 
+  const updateObject = useCallback(
+    (id: string, updater: (obj: CanvasObject) => CanvasObject) => {
+      setHistory((current) => {
+        const idx = current.present.findIndex((obj) => obj.id === id)
+        if (idx === -1) return current
+        const updated = [...current.present]
+        updated[idx] = updater(updated[idx])
+        return {
+          past: [...current.past, current.present].slice(-MAX_HISTORY_ENTRIES),
+          present: updated,
+          future: [],
+        }
+      })
+    },
+    [],
+  )
+
+  const deleteObjects = useCallback((ids: string[]) => {
+    if (ids.length === 0) return
+    const idSet = new Set(ids)
+    setHistory((current) => {
+      const newPresent = current.present.filter((obj) => !idSet.has(obj.id))
+      // Skip pushing history if nothing was actually removed
+      if (newPresent.length === current.present.length) return current
+      return {
+        past: [...current.past, current.present].slice(-MAX_HISTORY_ENTRIES),
+        present: newPresent,
+        future: [],
+      }
+    })
+  }, [])
+
   const undo = useCallback(() => {
     setHistory((current) => {
       if (current.past.length === 0) {
@@ -72,6 +104,8 @@ export function useCanvasHistory() {
     canUndo,
     canRedo,
     addObject,
+    updateObject,
+    deleteObjects,
     undo,
     redo,
     setObjects,
