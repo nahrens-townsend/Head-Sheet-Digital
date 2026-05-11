@@ -17,6 +17,9 @@ import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
 
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 8;
+
 interface HeadSheetCanvasProps {
   objects: CanvasObject[];
   templateType: TemplateType;
@@ -39,7 +42,18 @@ export function HeadSheetCanvas({
   const liveLineRef = useRef<Konva.Line | null>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
-  const { tool, color, strokeSize, selectedObjectIds } = useCanvasStore();
+  const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset } =
+    useCanvasStore();
+
+  // Mutable refs so native event handlers always see the latest values without
+  // needing to be re-registered on every render.
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panOffsetRef = useRef(panOffset);
+  panOffsetRef.current = panOffset;
+
+  // Set to true while a two-finger pinch is active so Stage drawing is suppressed.
+  const isPinchingRef = useRef(false);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -91,6 +105,153 @@ export function HeadSheetCanvas({
     };
   }, [templateType]);
 
+  // Zoom / pan via native events on the container div.
+  // Pointer capture phase ensures isPinchingRef is set before Konva's handlers check it.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const activePointers = new Map<number, { x: number; y: number }>();
+    let lastPinchDist = 0;
+    let lastPinchCenter = { x: 0, y: 0 };
+    let pinchClearTimeout: ReturnType<typeof setTimeout> | null = null;
+    let isPanning = false;
+    let panStart = { x: 0, y: 0 };
+    let panOffsetAtStart = { x: 0, y: 0 };
+
+    const applyZoom = (rawZoom: number, pivotCanvas: { x: number; y: number }) => {
+      const clamped = Math.min(Math.max(rawZoom, MIN_ZOOM), MAX_ZOOM);
+      const oldZoom = zoomRef.current;
+      const contentAnchor = {
+        x: (pivotCanvas.x - panOffsetRef.current.x) / oldZoom,
+        y: (pivotCanvas.y - panOffsetRef.current.y) / oldZoom,
+      };
+      setZoom(clamped);
+      setPanOffset({
+        x: pivotCanvas.x - contentAnchor.x * clamped,
+        y: pivotCanvas.y - contentAnchor.y * clamped,
+      });
+      return clamped;
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const pivot = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      // Trackpad pinch sends wheel+ctrlKey with small deltas; use finer scale factor.
+      const scaleBy = e.ctrlKey ? 1.05 : 1.15;
+      const newZoom = e.deltaY < 0 ? zoomRef.current * scaleBy : zoomRef.current / scaleBy;
+      applyZoom(newZoom, pivot);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (e.button === 1 && e.pointerType === 'mouse') {
+        isPanning = true;
+        panStart = { x: e.clientX, y: e.clientY };
+        panOffsetAtStart = { ...panOffsetRef.current };
+        el.style.cursor = 'grabbing';
+        el.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+
+      if (activePointers.size === 2) {
+        if (pinchClearTimeout !== null) {
+          clearTimeout(pinchClearTimeout);
+          pinchClearTimeout = null;
+        }
+        isPinchingRef.current = true;
+        const pts = [...activePointers.values()];
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        // Guard against near-zero initial distance to prevent zoom explosion on first move.
+        lastPinchDist = dist < 1 ? 1 : dist;
+        lastPinchCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        e.stopPropagation();
+        return;
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (isPanning) {
+        setPanOffset({
+          x: panOffsetAtStart.x + (e.clientX - panStart.x),
+          y: panOffsetAtStart.y + (e.clientY - panStart.y),
+        });
+        e.stopPropagation();
+        return;
+      }
+
+      if (isPinchingRef.current && activePointers.size === 2) {
+        const pts = [...activePointers.values()];
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        // Skip update if distance is negligible to avoid jitter.
+        if (dist < 1) return;
+        const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        const rect = el.getBoundingClientRect();
+        const pivotCanvas = { x: center.x - rect.left, y: center.y - rect.top };
+
+        const newZoom = zoomRef.current * (dist / lastPinchDist);
+        const clamped = Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM);
+        const contentAnchor = {
+          x: (pivotCanvas.x - panOffsetRef.current.x) / zoomRef.current,
+          y: (pivotCanvas.y - panOffsetRef.current.y) / zoomRef.current,
+        };
+        setZoom(clamped);
+        setPanOffset({
+          x: pivotCanvas.x - contentAnchor.x * clamped + (center.x - lastPinchCenter.x),
+          y: pivotCanvas.y - contentAnchor.y * clamped + (center.y - lastPinchCenter.y),
+        });
+
+        lastPinchDist = dist;
+        lastPinchCenter = center;
+        e.stopPropagation();
+      }
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      activePointers.delete(e.pointerId);
+
+      if (isPanning) {
+        isPanning = false;
+        el.style.cursor = '';
+        e.stopPropagation();
+        return;
+      }
+
+      if (isPinchingRef.current) {
+        if (activePointers.size < 2) {
+          // Brief grace period prevents a stray draw on finger lift.
+          // Store the timeout id so a rapid new pinch can cancel it.
+          pinchClearTimeout = setTimeout(() => {
+            if (activePointers.size < 2) isPinchingRef.current = false;
+            pinchClearTimeout = null;
+          }, 60);
+        }
+        e.stopPropagation();
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('pointerdown', onPointerDown, { capture: true });
+    el.addEventListener('pointermove', onPointerMove, { capture: true });
+    el.addEventListener('pointerup', onPointerUp, { capture: true });
+    el.addEventListener('pointercancel', onPointerUp, { capture: true });
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('pointerdown', onPointerDown, { capture: true });
+      el.removeEventListener('pointermove', onPointerMove, { capture: true });
+      el.removeEventListener('pointerup', onPointerUp, { capture: true });
+      el.removeEventListener('pointercancel', onPointerUp, { capture: true });
+    };
+  }, [setZoom, setPanOffset]); // stable Zustand setters; zoom/pan reads use refs
+
   const templateRect = useMemo<TemplateRect | null>(() => {
     if (!templateImage) {
       return null;
@@ -112,7 +273,7 @@ export function HeadSheetCanvas({
 
   const strokePixelWidth = STROKE_SIZES[strokeSize];
 
-  const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize);
+  const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize, zoom);
 
   const commonVectorOpts = { stageRef, stageSize, color, strokeSize, onObjectComplete, snap, clearSnap };
 
@@ -142,7 +303,7 @@ export function HeadSheetCanvas({
     objects,
   });
 
-  const pointerHandlers = useMemo(() => {
+  const rawHandlers = useMemo(() => {
     switch (tool) {
       case 'select':
         return selectTool;
@@ -172,10 +333,14 @@ export function HeadSheetCanvas({
         ref={stageRef}
         width={stageSize.width}
         height={stageSize.height}
-        onPointerDown={pointerHandlers.onPointerDown as StagePointerHandler}
-        onPointerMove={pointerHandlers.onPointerMove as StagePointerHandler}
-        onPointerUp={pointerHandlers.onPointerUp as StagePointerHandler}
-        onPointerLeave={pointerHandlers.onPointerUp as StagePointerHandler}
+        scaleX={zoom}
+        scaleY={zoom}
+        x={panOffset.x}
+        y={panOffset.y}
+        onPointerDown={(e) => { if (!isPinchingRef.current) (rawHandlers.onPointerDown as StagePointerHandler)(e); }}
+        onPointerMove={(e) => { if (!isPinchingRef.current) (rawHandlers.onPointerMove as StagePointerHandler)(e); }}
+        onPointerUp={(e) => { if (!isPinchingRef.current) (rawHandlers.onPointerUp as StagePointerHandler)(e); }}
+        onPointerLeave={(e) => { if (!isPinchingRef.current) (rawHandlers.onPointerUp as StagePointerHandler)(e); }}
       >
         <BackgroundLayer
           stageSize={stageSize}
@@ -194,6 +359,7 @@ export function HeadSheetCanvas({
           objects={objects}
           selectedObjectIds={tool === 'select' ? selectedObjectIds : []}
           stageSize={stageSize}
+          zoom={zoom}
           onUpdateObject={onUpdateObject}
           snapIndicator={snapIndicator}
         />
