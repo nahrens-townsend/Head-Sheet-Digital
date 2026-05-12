@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import Konva from 'konva';
 import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
-import type { TemplateType } from '../types/headSheet';
+import type { CanvasMode, TemplateType } from '../types/headSheet';
 import type { CanvasObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
@@ -16,9 +16,54 @@ import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
+import { computeTemplateLayouts } from './utils/layoutEngine';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
+
+/** Loads one SVG per TemplateType and returns a Map keyed by type. */
+function useTemplateImages(types: TemplateType[]): Map<TemplateType, HTMLImageElement> {
+  const [images, setImages] = useState<Map<TemplateType, HTMLImageElement>>(new Map());
+  // Use a joined string as the effect key so the effect is stable when the
+  // array values haven't changed (even if the array reference has).
+  const typesKey = types.join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    const newMap = new Map<TemplateType, HTMLImageElement>();
+
+    if (types.length === 0) {
+      return;
+    }
+
+    let remaining = types.length;
+    const imgs: HTMLImageElement[] = [];
+    for (const type of types) {
+      const img = new window.Image();
+      imgs.push(img);
+      img.onload = () => {
+        if (cancelled) return;
+        newMap.set(type, img);
+        remaining--;
+        if (remaining === 0) setImages(new Map(newMap));
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        remaining--;
+        if (remaining === 0) setImages(new Map(newMap));
+      };
+      img.src = `/templates/head-${type}.svg`;
+    }
+
+    return () => {
+      cancelled = true;
+      imgs.forEach(img => { img.onload = null; img.onerror = null; });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typesKey]);
+
+  return images;
+}
 
 export interface HeadSheetCanvasHandle {
   getExportDataUrl: () => Promise<string>;
@@ -27,7 +72,9 @@ export interface HeadSheetCanvasHandle {
 
 interface HeadSheetCanvasProps {
   objects: CanvasObject[];
-  templateType: TemplateType;
+  templateTypes: TemplateType[];
+  canvasMode: CanvasMode;
+  imageDataUrl?: string | null;
   onObjectComplete: (object: CanvasObject) => void;
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void;
   onDeleteObjects: (ids: string[]) => void;
@@ -37,7 +84,9 @@ type TemplateRect = { x: number; y: number; width: number; height: number };
 
 export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvasProps>(function HeadSheetCanvas({
   objects,
-  templateType,
+  templateTypes,
+  canvasMode,
+  imageDataUrl,
   onObjectComplete,
   onUpdateObject,
   onDeleteObjects,
@@ -46,7 +95,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   const stageRef = useRef<Konva.Stage | null>(null);
   const liveLineRef = useRef<Konva.Line | null>(null);
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
-  const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
   const exportQueueRef = useRef(Promise.resolve() as Promise<void>)
@@ -56,10 +104,13 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   // Mutable refs so native event handlers always see the latest values without
   // needing to be re-registered on every render.
   const zoomRef = useRef(zoom);
+  // eslint-disable-next-line react-hooks/refs
   zoomRef.current = zoom;
   const panOffsetRef = useRef(panOffset);
+  // eslint-disable-next-line react-hooks/refs
   panOffsetRef.current = panOffset;
   const toolRef = useRef(tool);
+  // eslint-disable-next-line react-hooks/refs
   toolRef.current = tool;
 
   // Set to true while a two-finger pinch is active so Stage drawing is suppressed.
@@ -91,29 +142,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       observer.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    let mounted = true;
-    const image = new window.Image();
-
-    image.onload = () => {
-      if (mounted) {
-        setTemplateImage(image);
-      }
-    };
-
-    image.onerror = () => {
-      if (mounted) {
-        setTemplateImage(null);
-      }
-    };
-
-    image.src = `/templates/head-${templateType}.svg`;
-
-    return () => {
-      mounted = false;
-    };
-  }, [templateType]);
 
   // Zoom / pan via native events on the container div.
   // Pointer capture phase ensures isPinchingRef is set before Konva's handlers check it.
@@ -266,27 +294,55 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   // Clear any in-progress edit when switching away from select tool or during export.
   // Prevents the object from staying hidden if the drag is interrupted before onDragEnd fires.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isExporting || tool !== 'select') setEditingObjectId(null);
   }, [isExporting, tool]);
 
-  const templateRect = useMemo<TemplateRect | null>(() => {
-    if (!templateImage) {
-      return null;
+  // Load template SVG images for templates mode.
+  const templateImages = useTemplateImages(canvasMode === 'templates' ? templateTypes : []);
+
+  // Compute layout rects for all templates in the current stage.
+  // Guard on canvasMode so stale templateImages from a prior templates-mode sheet
+  // don't bleed through when the same component instance switches to image mode.
+  const layouts = useMemo(
+    () => canvasMode === 'templates'
+      ? computeTemplateLayouts(templateTypes, templateImages, stageSize)
+      : [],
+    [canvasMode, templateTypes, templateImages, stageSize],
+  );
+
+  // Load the uploaded image for image-mode canvases.
+  const [canvasImage, setCanvasImage] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (canvasMode !== 'image' || !imageDataUrl) {
+      return;
     }
+    let mounted = true;
+    const img = new window.Image();
+    img.onload = () => { if (mounted) setCanvasImage(img); };
+    img.onerror = () => { if (mounted) setCanvasImage(null); };
+    img.src = imageDataUrl;
+    return () => { mounted = false; };
+  }, [canvasMode, imageDataUrl]);
+  // Derive effective image: null when not in image mode or when no URL is set,
+  // so stale canvasImage state never bleeds between sheets in image mode.
+  const effectiveCanvasImage = canvasMode === 'image' && !!imageDataUrl ? canvasImage : null;
 
-    const sourceWidth = templateImage.naturalWidth || 400;
-    const sourceHeight = templateImage.naturalHeight || 500;
-    const scale = Math.min(stageSize.width / sourceWidth, stageSize.height / sourceHeight);
-    const width = sourceWidth * scale;
-    const height = sourceHeight * scale;
-
+  // Centre the canvas image within the stage for image mode.
+  const canvasImageRect = useMemo<TemplateRect | null>(() => {
+    if (!effectiveCanvasImage) return null;
+    const naturalWidth = effectiveCanvasImage.naturalWidth || 800;
+    const naturalHeight = effectiveCanvasImage.naturalHeight || 600;
+    const scale = Math.min(stageSize.width / naturalWidth, stageSize.height / naturalHeight);
+    const width = naturalWidth * scale;
+    const height = naturalHeight * scale;
     return {
-      width,
-      height,
       x: (stageSize.width - width) / 2,
       y: (stageSize.height - height) / 2,
+      width,
+      height,
     };
-  }, [stageSize.height, stageSize.width, templateImage]);
+  }, [effectiveCanvasImage, stageSize.width, stageSize.height]);
 
   const strokePixelWidth = STROKE_SIZES[strokeSize];
 
@@ -407,8 +463,9 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       >
         <BackgroundLayer
           stageSize={stageSize}
-          templateImage={templateImage}
-          templateRect={templateRect}
+          layouts={layouts}
+          canvasImage={effectiveCanvasImage}
+          canvasImageRect={canvasImageRect}
         />
         <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} hiddenObjectIds={editingObjectId ? new Set([editingObjectId]) : undefined} />
         <LiveLayer

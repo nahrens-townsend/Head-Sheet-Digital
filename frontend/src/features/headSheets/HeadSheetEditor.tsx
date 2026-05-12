@@ -203,7 +203,9 @@ export function HeadSheetEditor() {
         <HeadSheetCanvas
           ref={canvasRef}
           objects={objects}
-          templateType={sheet.templateType}
+          templateTypes={sheet.templateTypes.length > 0 ? sheet.templateTypes : [sheet.templateType]}
+          canvasMode={sheet.canvasMode}
+          imageDataUrl={sheet.imageDataUrl}
           onObjectComplete={addObject}
           onUpdateObject={updateObject}
           onDeleteObjects={deleteObjects}
