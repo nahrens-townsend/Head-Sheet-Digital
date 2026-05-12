@@ -7,11 +7,14 @@ public class HeadSheet
     public string Name { get; set; } = "Untitled Sheet";
     public string? ClientName { get; set; }
     public string TemplateType { get; set; } = "front";
+    public string? TemplateTypesJson { get; set; }
+    public string CanvasMode { get; set; } = "templates";
+    public string? ImageDataUrl { get; set; }
     public string StrokesJson { get; set; } = "[]";
     public string? ThumbnailUrl { get; set; }
+    public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public bool IsDeleted { get; set; }
 
     public User User { get; set; } = null!;
 }

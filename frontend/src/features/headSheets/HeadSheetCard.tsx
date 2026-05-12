@@ -11,6 +11,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
   front: 'Front view',
   back: 'Back view',
   side: 'Side view',
+  top: 'Top view',
 }
 
 export function HeadSheetCard({ sheet, onOpen, onDelete }: Props) {

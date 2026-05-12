@@ -1,3 +1,4 @@
+using System.Text.Json;
 using HeadSheet.Application.Interfaces;
 using HeadSheetEntity = HeadSheet.Domain.Entities.HeadSheet;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +45,11 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
             UserId = userId,
             Name = string.IsNullOrWhiteSpace(request.Name) ? "Untitled Sheet" : request.Name.Trim(),
             ClientName = string.IsNullOrWhiteSpace(request.ClientName) ? null : request.ClientName.Trim(),
-            TemplateType = request.TemplateType,
+            TemplateType = request.TemplateTypes is { Length: > 0 } ? request.TemplateTypes[0] : request.TemplateType,
+            TemplateTypesJson = request.TemplateTypes is { Length: > 0 }
+                ? JsonSerializer.Serialize(request.TemplateTypes)
+                : null,
+            CanvasMode = string.IsNullOrWhiteSpace(request.CanvasMode) ? "templates" : request.CanvasMode,
             StrokesJson = "[]",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -88,6 +93,22 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return ToDto(sheet);
     }
 
+    public async Task<HeadSheetDto?> SaveImageAsync(
+        Guid userId, Guid id, string imageDataUrl, CancellationToken ct = default)
+    {
+        var sheet = await db.HeadSheets
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId, ct);
+
+        if (sheet is null) return null;
+        if (sheet.CanvasMode != "image") return null;
+
+        sheet.ImageDataUrl = imageDataUrl;
+        sheet.UpdatedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return ToDto(sheet);
+    }
+
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
         var affected = await db.HeadSheets
@@ -99,6 +120,21 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return affected > 0;
     }
 
+    private static string[] ComputeTemplateTypes(HeadSheetEntity h)
+    {
+        if (!string.IsNullOrEmpty(h.TemplateTypesJson))
+        {
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<string[]>(h.TemplateTypesJson);
+                if (parsed is { Length: > 0 }) return parsed;
+            }
+            catch { /* fall through to legacy */ }
+        }
+        return [h.TemplateType];
+    }
+
     private static HeadSheetDto ToDto(HeadSheetEntity h) =>
-        new(h.Id, h.Name, h.ClientName, h.TemplateType, h.StrokesJson, h.CreatedAt, h.UpdatedAt);
+        new(h.Id, h.Name, h.ClientName, h.TemplateType, ComputeTemplateTypes(h),
+            h.CanvasMode, h.ImageDataUrl, h.StrokesJson, h.CreatedAt, h.UpdatedAt);
 }

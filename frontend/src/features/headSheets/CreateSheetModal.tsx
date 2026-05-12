@@ -82,6 +82,7 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
                 <option value="front">Front</option>
                 <option value="back">Back</option>
                 <option value="side">Side</option>
+                <option value="top">Top</option>
               </select>
             </div>
             {createSheet.isError && (

@@ -88,7 +88,7 @@ export function HeadSheetEditor() {
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
           strokes={strokes}
-          templateType={sheet.templateType}
+          templateType={sheet.templateTypes[0] ?? 'front'}
           onStrokeComplete={addStroke}
         />
       </div>

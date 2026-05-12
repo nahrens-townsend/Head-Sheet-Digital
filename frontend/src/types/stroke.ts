@@ -1,4 +1,4 @@
-export type ToolType = 'pen' | 'line' | 'eraser'
+export type ToolType = 'pen' | 'line' | 'arrow' | 'dotted' | 'eraser' | 'select' | 'hand' | 'note' | 'symmetry-line'
 
 export interface Stroke {
   id: string
