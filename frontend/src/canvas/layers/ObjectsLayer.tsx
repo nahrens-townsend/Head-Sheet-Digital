@@ -14,6 +14,7 @@ interface ObjectsLayerProps {
   stageSize: StageSize
   zoom: number
   panOffset: Point
+  hiddenObjectIds?: ReadonlySet<string>
 }
 
 // ── Viewport culling helpers ─────────────────────────────────────────────────
@@ -78,6 +79,7 @@ export const ObjectsLayer = memo(function ObjectsLayer({
   stageSize,
   zoom,
   panOffset,
+  hiddenObjectIds,
 }: ObjectsLayerProps) {
   // Only cull when zoomed in; at zoom ≤ 1 the full content area is visible.
   const visibleObjects =
@@ -89,6 +91,7 @@ export const ObjectsLayer = memo(function ObjectsLayer({
   return (
     <Layer listening={false}>
       {visibleObjects.map((obj) => {
+        if (hiddenObjectIds?.has(obj.id)) return null
         if (obj.type === 'pen' || obj.type === 'eraser') {
           // Erasers render at 2× the logical stroke width to remain more
           // effective than pen strokes — matching the live preview in LiveLayer.

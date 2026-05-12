@@ -513,13 +513,15 @@ code {
 .canvas-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 52px;
+  gap: 4px;
+  padding: 0 16px;
+  height: 58px;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
+  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0,0,0,0.04);
   flex-shrink: 0;
-  overflow-x: auto;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .canvas-toolbar__back { flex-shrink: 0; }
@@ -545,18 +547,18 @@ code {
 
 .toolbar-sep {
   width: 1px;
-  height: 20px;
+  height: 22px;
   background: var(--border);
-  margin: 0 2px;
+  margin: 0 6px;
 }
 
 .toolbar-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
@@ -565,7 +567,7 @@ code {
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 .toolbar-btn:hover:not(:disabled) { background: var(--accent-bg); color: var(--text-h); }
-.toolbar-btn--active { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
+.toolbar-btn--active { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); box-shadow: inset 0 1px 2px rgba(170, 59, 255, 0.12); }
 .toolbar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .toolbar-color {
@@ -584,14 +586,47 @@ code {
 }
 
 .toolbar-save-status {
-  font-size: 12px;
-  color: var(--text);
-  min-width: 50px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  min-width: 44px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: transparent;
   text-align: center;
+  color: var(--text);
 }
-.toolbar-save-status--saving { color: var(--accent); }
-.toolbar-save-status--saved { color: #22c55e; }
-.toolbar-save-status--error { color: #ef4444; }
+.toolbar-save-status--saving { background: var(--accent-bg); color: var(--accent); }
+.toolbar-save-status--saved  { background: rgba(34,197,94,0.1); color: #16a34a; }
+.toolbar-save-status--error  { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+/* ── Stroke size picker ─────────────────────────────────────── */
+
+.stroke-size-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.stroke-size-picker__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.12s, border-color 0.12s;
+}
+.stroke-size-picker__btn:hover { background: var(--accent-bg); color: var(--accent); }
+.stroke-size-picker__btn--active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
 
 .head-sheet-canvas {
   width: 100%;
@@ -603,6 +638,7 @@ code {
 .head-sheet-canvas--tool-pen    { cursor: crosshair; }
 .head-sheet-canvas--tool-line   { cursor: crosshair; }
 .head-sheet-canvas--tool-eraser { cursor: cell; }
+.head-sheet-canvas--tool-hand   { cursor: grab; }
 
 /* ── Selection panel (floating property bar) ────────────────── */
 

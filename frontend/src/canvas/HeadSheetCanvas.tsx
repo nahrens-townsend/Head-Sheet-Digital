@@ -48,6 +48,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
   const [templateImage, setTemplateImage] = useState<HTMLImageElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
   const exportQueueRef = useRef(Promise.resolve() as Promise<void>)
   const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset } =
     useCanvasStore();
@@ -58,6 +59,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   zoomRef.current = zoom;
   const panOffsetRef = useRef(panOffset);
   panOffsetRef.current = panOffset;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
 
   // Set to true while a two-finger pinch is active so Stage drawing is suppressed.
   const isPinchingRef = useRef(false);
@@ -154,7 +157,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const onPointerDown = (e: PointerEvent) => {
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-      if (e.button === 1 && e.pointerType === 'mouse') {
+      const isHandToolPan = e.button === 0 && e.pointerType === 'mouse' && toolRef.current === 'hand';
+      if ((e.button === 1 && e.pointerType === 'mouse') || isHandToolPan) {
         isPanning = true;
         panStart = { x: e.clientX, y: e.clientY };
         panOffsetAtStart = { ...panOffsetRef.current };
@@ -226,7 +230,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
       if (isPanning) {
         isPanning = false;
-        el.style.cursor = '';
+        el.style.cursor = toolRef.current === 'hand' ? 'grab' : '';
         e.stopPropagation();
         return;
       }
@@ -258,6 +262,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       el.removeEventListener('pointercancel', onPointerUp, { capture: true });
     };
   }, [setZoom, setPanOffset]); // stable Zustand setters; zoom/pan reads use refs
+
+  // Clear any in-progress edit when switching away from select tool or during export.
+  // Prevents the object from staying hidden if the drag is interrupted before onDragEnd fires.
+  useEffect(() => {
+    if (isExporting || tool !== 'select') setEditingObjectId(null);
+  }, [isExporting, tool]);
 
   const templateRect = useMemo<TemplateRect | null>(() => {
     if (!templateImage) {
@@ -366,6 +376,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         return dottedTool;
       case 'eraser':
         return eraserTool;
+      case 'hand':
+        return selectTool; // hand uses native pan; Stage handlers receive no meaningful events
       case 'pen':
       default:
         return penTool;
@@ -398,7 +410,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           templateImage={templateImage}
           templateRect={templateRect}
         />
-        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} />
+        <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} hiddenObjectIds={editingObjectId ? new Set([editingObjectId]) : undefined} />
         <LiveLayer
           liveLineRef={liveLineRef}
           tool={tool}
@@ -417,6 +429,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           snap={snap}
           clearSnap={clearSnap}
           isExporting={isExporting}
+          onDraftStart={setEditingObjectId}
+          onDraftEnd={() => setEditingObjectId(null)}
         />
       </Stage>
     </div>

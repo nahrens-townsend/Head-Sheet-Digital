@@ -111,6 +111,22 @@ function recomputeMid(
   }
 }
 
+/** Point on the quadratic Bézier at t=0.5, given start, control, and end. */
+function onCurveAtHalf(start: Point, ctrl: Point, end: Point): Point {
+  return {
+    x: 0.25 * start.x + 0.5 * ctrl.x + 0.25 * end.x,
+    y: 0.25 * start.y + 0.5 * ctrl.y + 0.25 * end.y,
+  }
+}
+
+/** Inverse: given the desired on-curve point q at t=0.5, derive the bezier ctrl. */
+function ctrlFromOnCurve(q: Point, start: Point, end: Point): Point {
+  return {
+    x: 2 * q.x - 0.5 * (start.x + end.x),
+    y: 2 * q.y - 0.5 * (start.y + end.y),
+  }
+}
+
 // ── ControlHandle ─────────────────────────────────────────────────────────────
 
 function ControlHandle({
@@ -118,6 +134,7 @@ function ControlHandle({
   y,
   radius,
   zoom,
+  onDragStart,
   onDragMove,
   onDragEnd,
 }: {
@@ -125,6 +142,7 @@ function ControlHandle({
   y: number
   radius: number
   zoom: number
+  onDragStart?: () => void
   onDragMove: (p: Point) => void
   onDragEnd: (p: Point) => void
 }) {
@@ -137,6 +155,7 @@ function ControlHandle({
       stroke={HANDLE_STROKE}
       strokeWidth={2 / zoom}
       draggable
+      onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove({ x: e.target.x(), y: e.target.y() })}
       onDragEnd={(e) => onDragEnd({ x: e.target.x(), y: e.target.y() })}
     />
@@ -155,6 +174,8 @@ interface SelectionLayerProps {
   snap?: SnapFn
   clearSnap?: () => void
   isExporting?: boolean
+  onDraftStart?: (id: string) => void
+  onDraftEnd?: () => void
 }
 
 export function SelectionLayer({
@@ -167,6 +188,8 @@ export function SelectionLayer({
   snap,
   clearSnap,
   isExporting = false,
+  onDraftStart,
+  onDraftEnd,
 }: SelectionLayerProps) {
   // Ref so drag callbacks always see the latest stageSize even after a window resize
   const stageSizeRef = useRef(stageSize)
@@ -174,10 +197,26 @@ export function SelectionLayer({
     stageSizeRef.current = stageSize
   }, [stageSize])
 
+  // Keep refs to draft state and onDraftEnd so the unmount cleanup can safely call it.
+  const onDraftEndRef = useRef(onDraftEnd)
+  useEffect(() => { onDraftEndRef.current = onDraftEnd }, [onDraftEnd])
+  const draftActiveRef = useRef(false)
+
   // Pixel-space draft positions for live visual feedback during any drag
   const [draftState, setDraftState] = useState<DraftState>(null)
   // Snapshot captured at body-drag start (does not drive renders)
   const bodyDragRef = useRef<BodyDragSnap>(null)
+
+  // Track whether a draft is currently active (used by unmount cleanup).
+  useEffect(() => { draftActiveRef.current = draftState !== null }, [draftState])
+
+  // If this component unmounts while a drag is in progress, clear the parent's
+  // editingObjectId so ObjectsLayer does not permanently hide the object.
+  useEffect(() => {
+    return () => {
+      if (draftActiveRef.current) onDraftEndRef.current?.()
+    }
+  }, [])
 
   if (isExporting) {
     return null
@@ -231,6 +270,7 @@ export function SelectionLayer({
                 onDragStart={(e) => {
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
                   if (!ptr) return
+                  onDraftStart?.(obj.id)
                   bodyDragRef.current = {
                     kind: 'pen',
                     id: obj.id,
@@ -260,6 +300,7 @@ export function SelectionLayer({
                   bodyDragRef.current = null
                   if (!ref || ref.kind !== 'pen' || ref.id !== obj.id) {
                     setDraftState(null)
+                    onDraftEnd?.()
                     return
                   }
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
@@ -272,6 +313,7 @@ export function SelectionLayer({
                     o.type === 'pen' ? { ...o, points: normalizePoints(newPts, ss) } : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
             </Group>
@@ -311,6 +353,7 @@ export function SelectionLayer({
                 onDragStart={(e) => {
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
                   if (!ptr) return
+                  onDraftStart?.(obj.id)
                   bodyDragRef.current = {
                     kind: 'line',
                     id: obj.id,
@@ -331,6 +374,12 @@ export function SelectionLayer({
                   const dy = ptr.y - ref.pointerStart.y
                   ref.lastDx = dx
                   ref.lastDy = dy
+                  // Update snap indicator during body drag — mirror the start-priority/end-fallback
+                  // logic used at onDragEnd so the indicator reflects which endpoint would actually snap.
+                  const bsStart = snap?.({ x: ref.snapStart.x + dx, y: ref.snapStart.y + dy }, obj.id)
+                  if (!bsStart?.snapped) {
+                    snap?.({ x: ref.snapEnd.x + dx, y: ref.snapEnd.y + dy }, obj.id)
+                  }
                   setDraftState({
                     kind: 'line',
                     id: obj.id,
@@ -344,6 +393,7 @@ export function SelectionLayer({
                   bodyDragRef.current = null
                   if (!ref || ref.kind !== 'line' || ref.id !== obj.id) {
                     setDraftState(null)
+                    onDraftEnd?.()
                     return
                   }
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
@@ -385,17 +435,8 @@ export function SelectionLayer({
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
-              />
-
-              {/* Dashed guide lines — update live during any drag */}
-              <Line
-                points={[dStart.x, dStart.y, dMid.x, dMid.y, dEnd.x, dEnd.y]}
-                stroke={SELECTION_HIGHLIGHT}
-                strokeWidth={1}
-                opacity={0.5}
-                dash={[4, 4]}
-                listening={false}
               />
 
               {/* Live bezier overlay — only rendered during an active drag */}
@@ -423,36 +464,47 @@ export function SelectionLayer({
                 y={cStart.y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
-                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: p, mid: newMid, end: cEnd })
+                  const sr = snap?.(p, obj.id)
+                  const sp = sr?.point ?? p
+                  const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: sp, mid: newMid, end: cEnd })
                 }}
                 onDragEnd={(p) => {
-                  const newMid = recomputeMid(p, cEnd, cStart, cMid, cEnd)
+                  const sr = snap?.(p, obj.id)
+                  const sp = sr?.point ?? p
+                  clearSnap?.()
+                  const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
                   const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, start: normalizePoint(p, ss), mid: normalizePoint(newMid, ss) }
+                      ? { ...o, start: normalizePoint(sp, ss), mid: normalizePoint(newMid, ss) }
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
               <ControlHandle
-                x={cMid.x}
-                y={cMid.y}
+                x={onCurveAtHalf(dStart, dMid, dEnd).x}
+                y={onCurveAtHalf(dStart, dMid, dEnd).y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: p, end: cEnd })
+                  const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: ctrl, end: cEnd })
                 }}
                 onDragEnd={(p) => {
+                  const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(p, stageSizeRef.current) }
+                      ? { ...o, mid: normalizePoint(ctrl, stageSizeRef.current) }
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
               <ControlHandle
@@ -460,19 +512,26 @@ export function SelectionLayer({
                 y={cEnd.y}
                 radius={handleRadius}
                 zoom={zoom}
+                onDragStart={() => onDraftStart?.(obj.id)}
                 onDragMove={(p) => {
-                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: p })
+                  const sr = snap?.(p, obj.id)
+                  const ep = sr?.point ?? p
+                  const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: ep })
                 }}
                 onDragEnd={(p) => {
-                  const newMid = recomputeMid(cStart, p, cStart, cMid, cEnd)
+                  const sr = snap?.(p, obj.id)
+                  const ep = sr?.point ?? p
+                  clearSnap?.()
+                  const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
                   const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(p, ss) }
+                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(ep, ss) }
                       : o,
                   )
                   setDraftState(null)
+                  onDraftEnd?.()
                 }}
               />
             </Group>
