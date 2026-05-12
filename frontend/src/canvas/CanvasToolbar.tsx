@@ -104,6 +104,16 @@ export function CanvasToolbar({
 
         <button
           type="button"
+          className={`toolbar-btn ${tool === 'note' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('note')}
+          aria-label="Note tool"
+          title="Note"
+        >
+          🗒
+        </button>
+
+        <button
+          type="button"
           className={`toolbar-btn ${tool === 'hand' ? 'toolbar-btn--active' : ''}`}
           onClick={() => setTool('hand')}
           aria-label="Pan tool"
