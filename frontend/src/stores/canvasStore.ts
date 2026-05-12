@@ -12,6 +12,7 @@ interface CanvasState {
   selectedObjectIds: string[]
   zoom: number
   panOffset: Point
+  showGuides: boolean
   setTool: (tool: ToolType) => void
   setColor: (color: string) => void
   setStrokeSize: (strokeSize: StrokeSize) => void
@@ -19,6 +20,7 @@ interface CanvasState {
   setSelectedObjectIds: (ids: string[]) => void
   setZoom: (zoom: number) => void
   setPanOffset: (offset: Point) => void
+  setShowGuides: (show: boolean) => void
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -29,6 +31,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   selectedObjectIds: [],
   zoom: 1.0,
   panOffset: { x: 0, y: 0 },
+  showGuides: true,
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color: PALETTE.includes(color) ? color : PALETTE[0] }),
   setStrokeSize: (strokeSize) => set({ strokeSize }),
@@ -36,4 +39,5 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setSelectedObjectIds: (selectedObjectIds) => set({ selectedObjectIds }),
   setZoom: (zoom) => set({ zoom }),
   setPanOffset: (panOffset) => set({ panOffset }),
+  setShowGuides: (showGuides) => set({ showGuides }),
 }))

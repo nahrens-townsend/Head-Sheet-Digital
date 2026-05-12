@@ -34,7 +34,7 @@ export function CanvasToolbar({
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
-  const { tool, color, strokeSize, setTool, setColor, setStrokeSize } = useCanvasStore()
+  const { tool, color, strokeSize, setTool, setColor, setStrokeSize, showGuides, setShowGuides } = useCanvasStore()
 
   return (
     <div className="canvas-toolbar">
@@ -113,6 +113,17 @@ export function CanvasToolbar({
         </button>
 
         <span className="toolbar-sep" aria-hidden="true" />
+
+        <button
+          type="button"
+          className={`toolbar-btn ${showGuides ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setShowGuides(!showGuides)}
+          aria-label="Toggle guides"
+          aria-pressed={showGuides}
+          title="Toggle guides"
+        >
+          ⊕
+        </button>
 
         <button
           type="button"
