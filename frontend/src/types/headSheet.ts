@@ -10,6 +10,7 @@ export interface HeadSheet {
   canvasMode: CanvasMode
   imageDataUrl: string | null
   strokesJson: string
+  thumbnailUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -20,6 +21,7 @@ export interface HeadSheetSummary {
   clientName: string | null
   /** Legacy single-template field — kept for backward compat; equals templateTypes[0]. */
   templateType: TemplateType
+  thumbnailUrl: string | null
   updatedAt: string
 }
 

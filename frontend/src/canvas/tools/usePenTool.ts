@@ -1,14 +1,12 @@
 import { useCallback, useRef } from 'react'
 import type React from 'react'
 import Konva from 'konva'
-import type { Stroke } from '../../types/stroke'
+import type { PenStrokeObject } from '../../types/canvasObject'
 import {
   getStagePoint,
   normalizePoints,
   createStrokeId,
-  STROKE_SIZES,
   type StageSize,
-  type StagePointerEvent,
   type StrokeSize,
 } from '../utils/canvasUtils'
 
@@ -18,7 +16,7 @@ interface UsePenToolOptions {
   stageSize: StageSize
   color: string
   strokeSize: StrokeSize
-  onStrokeComplete: (stroke: Stroke) => void
+  onObjectComplete: (object: PenStrokeObject) => void
 }
 
 export function usePenTool({
@@ -27,13 +25,13 @@ export function usePenTool({
   stageSize,
   color,
   strokeSize,
-  onStrokeComplete,
+  onObjectComplete,
 }: UsePenToolOptions) {
   const isDrawingRef = useRef(false)
   const currentPointsRef = useRef<number[]>([])
 
   const onPointerDown = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       const point = getStagePoint(stageRef, stageSize)
       if (!point) {
         return
@@ -48,7 +46,7 @@ export function usePenTool({
   )
 
   const onPointerMove = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!isDrawingRef.current) {
         return
       }
@@ -70,7 +68,7 @@ export function usePenTool({
   )
 
   const onPointerUp = useCallback(
-    (_event: StagePointerEvent) => {
+    () => {
       if (!isDrawingRef.current || currentPointsRef.current.length < 2) {
         isDrawingRef.current = false
         currentPointsRef.current = []
@@ -84,16 +82,14 @@ export function usePenTool({
           ? [...currentPointsRef.current, ...currentPointsRef.current]
           : currentPointsRef.current
 
-      onStrokeComplete({
+      onObjectComplete({
+        type: 'pen',
         id: createStrokeId(),
-        tool: 'pen',
         color,
-        width: STROKE_SIZES[strokeSize],
+        width: strokeSize,
         opacity: 1,
         points: normalizePoints(points, stageSize),
         tension: 0.35,
-        lineCap: 'round',
-        lineJoin: 'round',
         createdAt: new Date().toISOString(),
       })
 
@@ -102,7 +98,7 @@ export function usePenTool({
       liveLineRef.current?.points([])
       liveLineRef.current?.getLayer()?.batchDraw()
     },
-    [strokeSize, color, liveLineRef, onStrokeComplete, stageSize],
+    [strokeSize, color, liveLineRef, onObjectComplete, stageSize],
   )
 
   return {

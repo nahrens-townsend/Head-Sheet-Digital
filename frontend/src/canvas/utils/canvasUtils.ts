@@ -36,7 +36,9 @@ export function getStagePoint(
   stageSize: StageSize,
 ): Point | null {
   const stage = stageRef.current
-  const point = stage?.getPointerPosition()
+  // getRelativePointerPosition accounts for stage scaleX/scaleY and x/y (zoom + pan),
+  // returning the pointer position in canvas content-space rather than screen-space.
+  const point = stage?.getRelativePointerPosition()
 
   if (!stage || !point || stageSize.width <= 0 || stageSize.height <= 0) {
     return null
@@ -58,6 +60,14 @@ export function denormalizePoints(points: number[], stageSize: StageSize): numbe
   return points.map((value, index) =>
     index % 2 === 0 ? value * stageSize.width : value * stageSize.height,
   )
+}
+
+export function normalizePoint(p: Point, stageSize: StageSize): Point {
+  return { x: p.x / stageSize.width, y: p.y / stageSize.height }
+}
+
+export function denormalizePoint(p: Point, stageSize: StageSize): Point {
+  return { x: p.x * stageSize.width, y: p.y * stageSize.height }
 }
 
 export function createStrokeId(): string {

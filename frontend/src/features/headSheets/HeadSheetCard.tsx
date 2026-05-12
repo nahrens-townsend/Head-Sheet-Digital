@@ -25,6 +25,16 @@ export function HeadSheetCard({ sheet, onOpen, onDelete }: Props) {
 
   return (
     <div className="sheet-card">
+      <div className="sheet-card__preview">
+        {sheet.thumbnailUrl ? (
+          <img src={sheet.thumbnailUrl} alt="" className="sheet-card__preview-image" loading="lazy" />
+        ) : (
+          <div className="sheet-card__preview-empty">
+            <span>Head sheet</span>
+            <small>{TEMPLATE_LABELS[sheet.templateType] ?? sheet.templateType}</small>
+          </div>
+        )}
+      </div>
       <button className="sheet-card__body" onClick={() => onOpen(sheet.id)} aria-label={`Open ${sheet.name}`}>
         <p className="sheet-card__name">{sheet.name}</p>
         <div className="sheet-card__meta">

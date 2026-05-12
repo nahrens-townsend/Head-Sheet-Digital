@@ -5,7 +5,7 @@ import type {
   PagedResult,
   UpdateHeadSheetPayload,
 } from '../types/headSheet'
-import type { Stroke } from '../types/stroke'
+import type { CanvasData } from '../types/canvasObject'
 import { apiClient } from './client'
 
 type ApiResponse<T> = { success: boolean; data: T; error: string | null }
@@ -25,10 +25,18 @@ export const headSheetsApi = {
   update: (id: string, payload: UpdateHeadSheetPayload) =>
     apiClient.put<ApiResponse<HeadSheet>>(`/head-sheets/${id}`, payload).then((r) => r.data),
 
-  saveStrokes: (id: string, strokes: Stroke[]) =>
+  saveStrokes: (id: string, data: CanvasData) =>
     apiClient
       .put<ApiResponse<HeadSheet>>(`/head-sheets/${id}/strokes`, {
-        strokesJson: JSON.stringify(strokes),
+        strokesJson: JSON.stringify(data),
+      })
+      .then((r) => r.data),
+
+  saveThumbnail: (id: string, thumbnailDataUrl: string, expectedUpdatedAt: string) =>
+    apiClient
+      .put<ApiResponse<HeadSheet>>(`/head-sheets/${id}/thumbnail`, {
+        thumbnailDataUrl,
+        expectedUpdatedAt,
       })
       .then((r) => r.data),
 

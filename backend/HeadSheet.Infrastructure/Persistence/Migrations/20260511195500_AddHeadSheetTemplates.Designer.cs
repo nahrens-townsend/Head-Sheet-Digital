@@ -3,6 +3,7 @@ using System;
 using HeadSheet.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HeadSheet.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260511195500_AddHeadSheetTemplates")]
+    partial class AddHeadSheetTemplates
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,14 +32,6 @@ namespace HeadSheet.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("CanvasMode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("templates")
-                        .HasColumnName("canvas_mode");
-
                     b.Property<string>("ClientName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -45,10 +40,6 @@ namespace HeadSheet.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<string>("ImageDataUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("image_data_url");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -82,10 +73,6 @@ namespace HeadSheet.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("front")
                         .HasColumnName("template_type");
-
-                    b.Property<string>("TemplateTypesJson")
-                        .HasColumnType("text")
-                        .HasColumnName("template_types_json");
 
                     b.Property<string>("ThumbnailUrl")
                         .HasColumnType("text")

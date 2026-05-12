@@ -22,6 +22,7 @@ public record HeadSheetResponseDto(
     string CanvasMode,
     string? ImageDataUrl,
     string StrokesJson,
+    string? ThumbnailUrl,
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
@@ -30,6 +31,7 @@ public record HeadSheetSummaryResponseDto(
     string Name,
     string? ClientName,
     string TemplateType,
+    string? ThumbnailUrl,
     DateTime UpdatedAt);
 
 public record PagedResponseDto<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);

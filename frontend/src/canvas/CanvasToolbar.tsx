@@ -5,8 +5,11 @@ import { StrokeSizePicker } from '../components/BrushSizeSlider/StrokeSizePicker
 interface CanvasToolbarProps {
   canUndo: boolean
   canRedo: boolean
+  canSaveTemplate: boolean
   onUndo: () => void
   onRedo: () => void
+  onExport: () => void
+  onSaveTemplate: () => void
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   sheetName: string
   onBack: () => void
@@ -22,8 +25,11 @@ const SAVE_STATUS_LABELS: Record<CanvasToolbarProps['saveStatus'], string> = {
 export function CanvasToolbar({
   canUndo,
   canRedo,
+  canSaveTemplate,
   onUndo,
   onRedo,
+  onExport,
+  onSaveTemplate,
   saveStatus,
   sheetName,
   onBack,
@@ -41,6 +47,15 @@ export function CanvasToolbar({
       </div>
 
       <div className="canvas-toolbar__right">
+        <button
+          type="button"
+          className={`toolbar-btn ${tool === 'select' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('select')}
+          aria-label="Select tool"
+          title="Select"
+        >
+          ↖
+        </button>
         <button
           type="button"
           className={`toolbar-btn ${tool === 'pen' ? 'toolbar-btn--active' : ''}`}
@@ -61,12 +76,62 @@ export function CanvasToolbar({
         </button>
         <button
           type="button"
+          className={`toolbar-btn ${tool === 'arrow' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('arrow')}
+          aria-label="Arrow tool"
+          title="Arrow"
+        >
+          →
+        </button>
+        <button
+          type="button"
+          className={`toolbar-btn ${tool === 'dotted' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('dotted')}
+          aria-label="Dotted line tool"
+          title="Dotted line"
+        >
+          ⋯
+        </button>
+        <button
+          type="button"
           className={`toolbar-btn ${tool === 'eraser' ? 'toolbar-btn--active' : ''}`}
           onClick={() => setTool('eraser')}
           aria-label="Eraser tool"
           title="Eraser"
-        >
+          >
           ⌫
+        </button>
+
+        <button
+          type="button"
+          className={`toolbar-btn ${tool === 'hand' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('hand')}
+          aria-label="Pan tool"
+          title="Pan (Hand)"
+        >
+          ✋
+        </button>
+
+        <span className="toolbar-sep" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="toolbar-btn"
+          onClick={onExport}
+          aria-label="Export PNG"
+          title="Export PNG"
+        >
+          ⤓
+        </button>
+        <button
+          type="button"
+          className="toolbar-btn"
+          onClick={onSaveTemplate}
+          disabled={!canSaveTemplate}
+          aria-label="Save as template"
+          title="Save as template"
+        >
+          ★
         </button>
 
         <span className="toolbar-sep" aria-hidden="true" />

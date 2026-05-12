@@ -20,6 +20,7 @@ public class HeadSheetConfiguration : IEntityTypeConfiguration<HeadSheetEntity>
         builder.Property(x => x.ImageDataUrl).HasColumnName("image_data_url");
         builder.Property(x => x.StrokesJson).HasColumnName("strokes_json").HasColumnType("jsonb").IsRequired().HasDefaultValueSql("'[]'::jsonb");
         builder.Property(x => x.ThumbnailUrl).HasColumnName("thumbnail_url");
+        builder.Property(x => x.IsTemplate).HasColumnName("is_template").IsRequired().HasDefaultValue(false);
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.Property(x => x.IsDeleted).HasColumnName("is_deleted");
@@ -27,6 +28,7 @@ public class HeadSheetConfiguration : IEntityTypeConfiguration<HeadSheetEntity>
         builder.HasIndex(x => x.UserId).HasDatabaseName("IX_head_sheets_user_id");
         builder.HasIndex(x => new { x.UserId, x.ClientName }).HasDatabaseName("IX_head_sheets_client_name");
         builder.HasIndex(x => new { x.UserId, x.UpdatedAt }).HasDatabaseName("IX_head_sheets_updated_at");
+        builder.HasIndex(x => new { x.UserId, x.IsTemplate, x.UpdatedAt }).HasDatabaseName("IX_head_sheets_templates");
 
         builder.HasQueryFilter(x => !x.IsDeleted);
 

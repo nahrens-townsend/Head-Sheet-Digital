@@ -28,7 +28,7 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
         var result = await headSheetService.ListAsync(userId.Value, clientName, page, pageSize, ct);
 
         var dto = new PagedResponseDto<HeadSheetSummaryResponseDto>(
-            result.Items.Select(x => new HeadSheetSummaryResponseDto(x.Id, x.Name, x.ClientName, x.TemplateType, x.UpdatedAt)).ToList(),
+            result.Items.Select(x => new HeadSheetSummaryResponseDto(x.Id, x.Name, x.ClientName, x.TemplateType, x.ThumbnailUrl, x.UpdatedAt)).ToList(),
             result.TotalCount, result.Page, result.PageSize);
 
         return Ok(ApiResponse.Ok(dto));

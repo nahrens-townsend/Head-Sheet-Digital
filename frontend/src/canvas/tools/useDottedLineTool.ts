@@ -5,7 +5,7 @@ import { useVectorLineTool } from './useVectorLineTool'
 import type { StageSize, StrokeSize } from '../utils/canvasUtils'
 import type { SnapFn } from '../utils/snapping'
 
-interface UseLineToolOptions {
+interface UseDottedLineToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
   stageSize: StageSize
   color: string
@@ -15,7 +15,6 @@ interface UseLineToolOptions {
   clearSnap?: () => void
 }
 
-export function useLineTool(options: UseLineToolOptions) {
-  return useVectorLineTool({ ...options, type: 'line' })
+export function useDottedLineTool(options: UseDottedLineToolOptions) {
+  return useVectorLineTool({ ...options, type: 'dotted' })
 }
-
