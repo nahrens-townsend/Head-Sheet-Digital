@@ -15,6 +15,9 @@ public class HeadSheetConfiguration : IEntityTypeConfiguration<HeadSheetEntity>
         builder.Property(x => x.Name).HasColumnName("name").IsRequired().HasMaxLength(200).HasDefaultValue("Untitled Sheet");
         builder.Property(x => x.ClientName).HasColumnName("client_name").HasMaxLength(200);
         builder.Property(x => x.TemplateType).HasColumnName("template_type").IsRequired().HasMaxLength(20).HasDefaultValue("front");
+        builder.Property(x => x.TemplateTypesJson).HasColumnName("template_types_json").HasColumnType("text");
+        builder.Property(x => x.CanvasMode).HasColumnName("canvas_mode").IsRequired().HasMaxLength(20).HasDefaultValue("templates");
+        builder.Property(x => x.ImageDataUrl).HasColumnName("image_data_url").HasColumnType("text");
         builder.Property(x => x.StrokesJson).HasColumnName("strokes_json").HasColumnType("jsonb").IsRequired().HasDefaultValueSql("'[]'::jsonb");
         builder.Property(x => x.ThumbnailUrl).HasColumnName("thumbnail_url");
         builder.Property(x => x.IsTemplate).HasColumnName("is_template").IsRequired().HasDefaultValue(false);

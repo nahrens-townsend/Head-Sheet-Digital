@@ -7,6 +7,12 @@ public class HeadSheet
     public string Name { get; set; } = "Untitled Sheet";
     public string? ClientName { get; set; }
     public string TemplateType { get; set; } = "front";
+    /// <summary>JSON array of template types, e.g. ["front","back"]. Null = use legacy <see cref="TemplateType"/>.</summary>
+    public string? TemplateTypesJson { get; set; }
+    /// <summary>Canvas mode: "templates" or "image".</summary>
+    public string CanvasMode { get; set; } = "templates";
+    /// <summary>Base64 PNG data URL for image-mode canvases.</summary>
+    public string? ImageDataUrl { get; set; }
     public string StrokesJson { get; set; } = "[]";
     public string? ThumbnailUrl { get; set; }
     public bool IsTemplate { get; set; }
