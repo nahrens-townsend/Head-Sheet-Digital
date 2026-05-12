@@ -1,27 +1,27 @@
-import { Circle, Layer, Line } from 'react-konva'
-import type { TemplateLayout } from '../utils/layoutEngine'
-import { resolveGuidePoints } from '../utils/guidePoints'
+import { Circle, Layer, Line } from 'react-konva';
+import type { TemplateLayout } from '../utils/layoutEngine';
+import { resolveGuidePoints } from '../utils/guidePoints';
 
-const AXIS_COLOR = 'rgba(255,34,34,0.35)'
-const AXIS_STROKE_WIDTH = 1
-const AXIS_DASH = [6, 4]
-const GUIDE_RADIUS = 5
+const AXIS_COLOR = 'rgba(255,34,34,0.35)';
+const AXIS_STROKE_WIDTH = 1;
+const AXIS_DASH = [6, 4];
+const GUIDE_RADIUS = 5;
 
 interface GuideLayerProps {
-  layouts: TemplateLayout[]
-  showGuides: boolean
-  isExporting?: boolean
+  layouts: TemplateLayout[];
+  showGuides: boolean;
+  isExporting?: boolean;
 }
 
 export function GuideLayer({ layouts, showGuides, isExporting = false }: GuideLayerProps) {
-  if (!showGuides || isExporting) return null
+  if (!showGuides || isExporting) return null;
 
-  const resolvedPoints = resolveGuidePoints(layouts)
+  const resolvedPoints = resolveGuidePoints(layouts);
 
   return (
     <Layer listening={false}>
       {/* Dashed vertical center-axis line per template */}
-      {layouts.map((layout) => {
+      {/* {layouts.map((layout) => {
         const cx = layout.rect.x + layout.rect.width * 0.5
         return (
           <Line
@@ -34,7 +34,7 @@ export function GuideLayer({ layouts, showGuides, isExporting = false }: GuideLa
             listening={false}
           />
         )
-      })}
+      })} */}
 
       {/* Guide point dots */}
       {resolvedPoints.map((pt) => (
@@ -48,5 +48,5 @@ export function GuideLayer({ layouts, showGuides, isExporting = false }: GuideLa
         />
       ))}
     </Layer>
-  )
+  );
 }
