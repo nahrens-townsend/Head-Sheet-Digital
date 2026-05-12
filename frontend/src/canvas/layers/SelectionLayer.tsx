@@ -137,6 +137,7 @@ function ControlHandle({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onDblClick,
 }: {
   x: number
   y: number
@@ -145,6 +146,7 @@ function ControlHandle({
   onDragStart?: () => void
   onDragMove: (p: Point) => void
   onDragEnd: (p: Point) => void
+  onDblClick?: () => void
 }) {
   return (
     <Circle
@@ -158,6 +160,7 @@ function ControlHandle({
       onDragStart={() => onDragStart?.()}
       onDragMove={(e) => onDragMove({ x: e.target.x(), y: e.target.y() })}
       onDragEnd={(e) => onDragEnd({ x: e.target.x(), y: e.target.y() })}
+      onDblClick={onDblClick}
     />
   )
 }
@@ -505,6 +508,13 @@ export function SelectionLayer({
                   )
                   setDraftState(null)
                   onDraftEnd?.()
+                }}
+                onDblClick={() => {
+                  const straightMid = normalizePoint(
+                    { x: (cStart.x + cEnd.x) / 2, y: (cStart.y + cEnd.y) / 2 },
+                    stageSize,
+                  )
+                  onUpdateObject(obj.id, (o) => ({ ...o, mid: straightMid }))
                 }}
               />
               <ControlHandle
