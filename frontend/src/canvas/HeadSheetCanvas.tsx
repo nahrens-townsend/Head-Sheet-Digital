@@ -11,8 +11,10 @@ import { useDottedLineTool } from './tools/useDottedLineTool';
 import { usePenTool } from './tools/usePenTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
+import { resolveGuidePoints } from './utils/guidePoints';
 import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
+import { GuideLayer } from './layers/GuideLayer';
 import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
@@ -98,7 +100,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   const [isExporting, setIsExporting] = useState(false);
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
   const exportQueueRef = useRef(Promise.resolve() as Promise<void>)
-  const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset } =
+  const { tool, color, strokeSize, selectedObjectIds, zoom, panOffset, setZoom, setPanOffset, showGuides } =
     useCanvasStore();
 
   // Mutable refs so native event handlers always see the latest values without
@@ -346,7 +348,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
   const strokePixelWidth = STROKE_SIZES[strokeSize];
 
-  const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize, zoom);
+  const resolvedGuidePoints = useMemo(
+    () => canvasMode === 'templates' && showGuides ? resolveGuidePoints(layouts) : [],
+    [canvasMode, layouts, showGuides],
+  );
+
+  const { snap, clearSnap, snapIndicator } = useSnapping(objects, stageSize, zoom, 12, resolvedGuidePoints);
 
   const exportStage = useCallback(
     (maxDimension?: number) => {
@@ -467,6 +474,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           canvasImage={effectiveCanvasImage}
           canvasImageRect={canvasImageRect}
         />
+        <GuideLayer layouts={layouts} showGuides={showGuides} isExporting={isExporting} />
         <ObjectsLayer objects={objects} stageSize={stageSize} zoom={zoom} panOffset={panOffset} hiddenObjectIds={editingObjectId ? new Set([editingObjectId]) : undefined} />
         <LiveLayer
           liveLineRef={liveLineRef}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Circle, Group, Layer, Line, Shape } from 'react-konva'
 import type { CanvasObject } from '../../types/canvasObject'
 import { isLineObject } from '../../types/canvasObject'
-import type { SnapFn } from '../utils/snapping'
+import type { SnapFn, SnapIndicator } from '../utils/snapping'
 import {
   denormalizePoint,
   denormalizePoints,
@@ -17,7 +17,6 @@ const HANDLE_RADIUS = 7
 const HANDLE_FILL = '#ffffff'
 const HANDLE_STROKE = '#aa3bff'
 const SELECTION_HIGHLIGHT = '#aa3bff'
-const SNAP_COLOR = '#aa3bff'
 const BODY_HIT_WIDTH = 22
 
 // ── Draft state types ─────────────────────────────────────────────────────────
@@ -173,7 +172,7 @@ interface SelectionLayerProps {
   stageSize: StageSize
   zoom: number
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
-  snapIndicator?: Point | null
+  snapIndicator?: SnapIndicator | null
   snap?: SnapFn
   clearSnap?: () => void
   isExporting?: boolean
@@ -551,13 +550,13 @@ export function SelectionLayer({
         return null
       })}
 
-      {/* Snap indicator — shown while drawing a vector line near an endpoint */}
+      {/* Snap indicator — shown while drawing a vector line near an endpoint or guide point */}
       {snapIndicator && (
         <Circle
-          x={snapIndicator.x}
-          y={snapIndicator.y}
+          x={snapIndicator.point.x}
+          y={snapIndicator.point.y}
           radius={9 / zoom}
-          stroke={SNAP_COLOR}
+          stroke={snapIndicator.color}
           strokeWidth={2 / zoom}
           fill="transparent"
           listening={false}
