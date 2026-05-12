@@ -47,7 +47,7 @@ export function HeadSheetEditor() {
 
   useAutoSave(
     sheetId,
-    { version: 2, objects },
+    { version: 3, objects },
     async (canvasData) => {
       const res = await saveMutation.mutateAsync(canvasData)
       if (!res.success || !res.data) {
@@ -165,8 +165,8 @@ export function HeadSheetEditor() {
       const thumbnailDataUrl = await canvasRef.current?.getThumbnailDataUrl()
       await createTemplateMutation.mutateAsync({
         name,
-        templateType: sheet.templateType,
-        canvasData: { version: 2, objects },
+        templateType: sheet.templateTypes[0] ?? 'front',
+        canvasData: { version: 3, objects },
         thumbnailDataUrl: thumbnailDataUrl ?? undefined,
       })
       setShowSaveTemplate(false)
@@ -201,9 +201,18 @@ export function HeadSheetEditor() {
       />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
-          strokes={strokes}
+          ref={canvasRef}
+          objects={objects}
           templateType={sheet.templateTypes[0] ?? 'front'}
-          onStrokeComplete={addStroke}
+          onObjectComplete={addObject}
+          onUpdateObject={updateObject}
+          onDeleteObjects={deleteObjects}
+        />
+        <SelectionPanel
+          objects={objects}
+          onUpdateObject={updateObject}
+          onDeleteObjects={deleteObjects}
+          onDuplicateObject={addObject}
         />
       </div>
       {showSaveTemplate && (

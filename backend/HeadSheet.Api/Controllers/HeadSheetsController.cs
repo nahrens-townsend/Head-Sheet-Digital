@@ -60,7 +60,8 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
                 dto.ClientName,
                 dto.TemplateType ?? "front",
                 dto.TemplateTypes,
-                dto.CanvasMode),
+                dto.CanvasMode,
+                dto.TemplateId),
             ct);
 
         return CreatedAtAction(nameof(Get), new { id = sheet.Id }, ApiResponse.Ok(ToResponseDto(sheet)));
@@ -98,6 +99,28 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
         if (sheet is null) return NotFound(ApiResponse.Fail<HeadSheetResponseDto>("Head sheet not found."));
 
         return Ok(ApiResponse.Ok(ToResponseDto(sheet)));
+    }
+
+    [HttpPut("{id:guid}/thumbnail")]
+    public async Task<IActionResult> SaveThumbnail(
+        Guid id, [FromBody] SaveThumbnailRequestDto dto, CancellationToken ct = default)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        if (!dto.ThumbnailDataUrl.StartsWith("data:image/png;base64,", StringComparison.Ordinal))
+            return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>("thumbnailDataUrl must be a PNG data URL."));
+
+        var result = await headSheetService.SaveThumbnailAsync(
+            userId.Value, id, dto.ThumbnailDataUrl, dto.ExpectedUpdatedAt, ct);
+
+        if (result.Status == SaveThumbnailStatus.NotFound)
+            return NotFound(ApiResponse.Fail<HeadSheetResponseDto>("Head sheet not found."));
+
+        if (result.Status == SaveThumbnailStatus.Conflict)
+            return Conflict(ApiResponse.Fail<HeadSheetResponseDto>("Thumbnail is out of date."));
+
+        return Ok(ApiResponse.Ok(ToResponseDto(result.Sheet!)));
     }
 
     [HttpPut("{id:guid}/image")]
@@ -138,5 +161,5 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
     private static HeadSheetResponseDto ToResponseDto(HeadSheetDto sheet) =>
         new(sheet.Id, sheet.Name, sheet.ClientName, sheet.TemplateType,
             sheet.TemplateTypes, sheet.CanvasMode, sheet.ImageDataUrl,
-            sheet.StrokesJson, sheet.CreatedAt, sheet.UpdatedAt);
+            sheet.StrokesJson, sheet.ThumbnailUrl, sheet.CreatedAt, sheet.UpdatedAt);
 }

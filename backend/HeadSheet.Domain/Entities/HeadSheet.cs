@@ -12,6 +12,7 @@ public class HeadSheet
     public string? ImageDataUrl { get; set; }
     public string StrokesJson { get; set; } = "[]";
     public string? ThumbnailUrl { get; set; }
+    public bool IsTemplate { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

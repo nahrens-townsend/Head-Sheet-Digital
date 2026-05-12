@@ -58,6 +58,11 @@ function getObjectBoundsNorm(
     if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 1, maxY: 1 }
     return { minX, minY, maxX, maxY }
   }
+  if (obj.type === 'note') {
+    // Notes have a fixed pixel size; use a generous margin in normalized space.
+    const m = 0.1
+    return { minX: obj.x - m, minY: obj.y - m, maxX: obj.x + m, maxY: obj.y + m }
+  }
   // line / arrow / dotted — bounding box of the three bezier control points
   return {
     minX: Math.min(obj.start.x, obj.mid.x, obj.end.x),

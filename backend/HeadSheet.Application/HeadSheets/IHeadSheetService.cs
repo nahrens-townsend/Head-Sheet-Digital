@@ -28,7 +28,8 @@ public record CreateHeadSheetRequest(
     string? ClientName,
     string TemplateType,
     string[]? TemplateTypes,
-    string? CanvasMode);
+    string? CanvasMode,
+    Guid? TemplateId = null);
 
 public record UpdateHeadSheetRequest(string Name, string? ClientName);
 public record SaveStrokesRequest(string StrokesJson);
@@ -57,6 +58,9 @@ public interface IHeadSheetService
     Task<HeadSheetDto?> SaveStrokesAsync(Guid userId, Guid id, string strokesJson, CancellationToken ct = default);
 
     Task<HeadSheetDto?> SaveImageAsync(Guid userId, Guid id, string imageDataUrl, CancellationToken ct = default);
+
+    Task<SaveThumbnailResult> SaveThumbnailAsync(
+        Guid userId, Guid id, string thumbnailUrl, DateTime expectedUpdatedAt, CancellationToken ct = default);
 
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default);
 }

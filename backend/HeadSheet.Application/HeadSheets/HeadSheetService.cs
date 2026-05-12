@@ -151,7 +151,41 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return [h.TemplateType];
     }
 
+    public async Task<SaveThumbnailResult> SaveThumbnailAsync(
+        Guid userId, Guid id, string thumbnailUrl, DateTime expectedUpdatedAt, CancellationToken ct = default)
+    {
+        var expected = NormalizeUtc(expectedUpdatedAt);
+        var now = NormalizeUtc(DateTime.UtcNow);
+        var affected = await db.HeadSheets
+            .Where(h => h.Id == id && h.UserId == userId && !h.IsTemplate && h.UpdatedAt == expected)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(h => h.ThumbnailUrl, thumbnailUrl)
+                .SetProperty(h => h.UpdatedAt, now), ct);
+
+        if (affected > 0)
+        {
+            var sheet = await db.HeadSheets
+                .FirstAsync(h => h.Id == id && h.UserId == userId && !h.IsTemplate, ct);
+            return new SaveThumbnailResult(SaveThumbnailStatus.Saved, ToDto(sheet));
+        }
+
+        var exists = await db.HeadSheets
+            .AnyAsync(h => h.Id == id && h.UserId == userId && !h.IsTemplate, ct);
+        if (!exists)
+            return new SaveThumbnailResult(SaveThumbnailStatus.NotFound, null);
+
+        var current = await db.HeadSheets
+            .FirstAsync(h => h.Id == id && h.UserId == userId && !h.IsTemplate, ct);
+        return new SaveThumbnailResult(SaveThumbnailStatus.Conflict, ToDto(current));
+    }
+
+    private static DateTime NormalizeUtc(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
+        return new DateTime(utc.Ticks / 10 * 10, DateTimeKind.Utc);
+    }
+
     private static HeadSheetDto ToDto(HeadSheetEntity h) =>
         new(h.Id, h.Name, h.ClientName, h.TemplateType, ComputeTemplateTypes(h),
-            h.CanvasMode, h.ImageDataUrl, h.StrokesJson, h.CreatedAt, h.UpdatedAt);
+            h.CanvasMode, h.ImageDataUrl, h.StrokesJson, h.ThumbnailUrl, h.CreatedAt, h.UpdatedAt);
 }

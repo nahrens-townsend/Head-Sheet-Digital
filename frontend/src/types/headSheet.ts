@@ -31,6 +31,7 @@ export interface CreateHeadSheetPayload {
   templateType: TemplateType
   templateTypes?: TemplateType[]
   canvasMode?: CanvasMode
+  templateId?: string
 }
 
 export interface UpdateHeadSheetPayload {

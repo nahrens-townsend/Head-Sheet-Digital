@@ -7,7 +7,8 @@ public record CreateHeadSheetRequestDto(
     [MaxLength(200)] string? ClientName,
     [Required, RegularExpression("^(front|back|side|top)$", ErrorMessage = "templateType must be front, back, side, or top.")] string TemplateType,
     string[]? TemplateTypes,
-    [RegularExpression("^(templates|image)$", ErrorMessage = "canvasMode must be templates or image.")] string? CanvasMode);
+    [RegularExpression("^(templates|image)$", ErrorMessage = "canvasMode must be templates or image.")] string? CanvasMode,
+    Guid? TemplateId);
 
 public record UpdateHeadSheetRequestDto(
     [Required, MaxLength(200)] string Name,
@@ -38,5 +39,9 @@ public record PagedResponseDto<T>(IReadOnlyList<T> Items, int TotalCount, int Pa
 
 // 5 MB cap: ~2,500 strokes of 200 points each — well beyond any real session.
 public record SaveStrokesRequestDto([Required, MaxLength(5_000_000)] string StrokesJson);
+
+public record SaveThumbnailRequestDto(
+    [Required, MaxLength(200_000)] string ThumbnailDataUrl,
+    [Required] DateTime ExpectedUpdatedAt);
 
 public record SaveImageRequestDto([Required, MaxLength(10_000_000)] string ImageDataUrl);

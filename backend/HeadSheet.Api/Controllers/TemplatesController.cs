@@ -52,6 +52,7 @@ public class TemplatesController(ITemplateService templateService) : ControllerB
 
         return Ok(ApiResponse.Ok(new HeadSheetResponseDto(
             template.Id, template.Name, template.ClientName, template.TemplateType,
+            template.TemplateTypes, template.CanvasMode, template.ImageDataUrl,
             template.StrokesJson, template.ThumbnailUrl, template.CreatedAt, template.UpdatedAt)));
     }
 
