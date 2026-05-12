@@ -60,6 +60,13 @@ export function useDeleteHeadSheet() {
   })
 }
 
+export function useSaveImage() {
+  return useMutation({
+    mutationFn: ({ id, imageDataUrl }: { id: string; imageDataUrl: string }) =>
+      headSheetsApi.saveImage(id, imageDataUrl),
+  })
+}
+
 export function useTemplates() {
   return useQuery({
     queryKey: TEMPLATES_KEY,

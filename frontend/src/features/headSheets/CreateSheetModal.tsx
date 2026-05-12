@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import type { TemplateType } from '../../types/headSheet'
-import { useCreateHeadSheet, useTemplates } from './useHeadSheets'
+import type { CanvasMode, TemplateType } from '../../types/headSheet'
+import { useCreateHeadSheet, useSaveImage, useTemplates } from './useHeadSheets'
+
+const ALL_TEMPLATE_TYPES: TemplateType[] = ['front', 'back', 'side', 'top']
 
 interface Props {
   onClose: () => void
@@ -10,40 +12,81 @@ interface Props {
 export function CreateSheetModal({ onClose, onCreated }: Props) {
   const [name, setName] = useState('')
   const [clientName, setClientName] = useState('')
-  const [templateType, setTemplateType] = useState<TemplateType>('front')
+  const [canvasMode, setCanvasMode] = useState<CanvasMode>('templates')
+  const [selectedTypes, setSelectedTypes] = useState<TemplateType[]>(['front'])
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
+  const [imageFileName, setImageFileName] = useState('')
+  const [imageMissing, setImageMissing] = useState(false)
+  const [isReading, setIsReading] = useState(false)
   const createSheet = useCreateHeadSheet()
+  const saveImage = useSaveImage()
   const templates = useTemplates()
   const nameRef = useRef<HTMLInputElement>(null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     nameRef.current?.focus()
+    return () => { mountedRef.current = false }
   }, [])
+
+  function toggleType(type: TemplateType) {
+    setSelectedTypes((prev) =>
+      prev.includes(type)
+        ? prev.length > 1 ? prev.filter((t) => t !== type) : prev
+        : [...prev, type],
+    )
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+
+    if (canvasMode === 'image' && !imageDataUrl) {
+      setImageMissing(true)
+      return
+    }
+    setImageMissing(false)
+
+    let createdId: string | undefined
     try {
       const res = await createSheet.mutateAsync({
         name: name.trim() || 'Untitled Sheet',
         clientName: clientName.trim() || undefined,
-        templateType,
-        templateId: selectedTemplateId ?? undefined,
+        templateType: selectedTypes[0] ?? 'front',
+        templateTypes: canvasMode === 'templates' ? selectedTypes : undefined,
+        canvasMode,
+        templateId: canvasMode === 'templates' ? (selectedTemplateId ?? undefined) : undefined,
       })
       if (res.success && res.data) {
-        onCreated(res.data.id)
+        createdId = res.data.id
       }
     } catch {
-      // error state handled by createSheet.isError
+      // createSheet.isError displays the error
+      return
     }
+
+    if (!createdId) return
+
+    if (canvasMode === 'image' && imageDataUrl) {
+      try {
+        await saveImage.mutateAsync({ id: createdId, imageDataUrl })
+      } catch {
+        // saveImage.isError displays the error; sheet was created — navigate anyway
+      }
+    }
+
+    onCreated(createdId)
   }
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose()
   }
 
+  const isPending = createSheet.isPending || saveImage.isPending || isReading
+
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick} role="presentation">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div className="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="modal__header">
           <h2 id="modal-title">New Head Sheet</h2>
           <button className="modal__close btn btn--ghost" onClick={onClose} aria-label="Close">
@@ -75,67 +118,139 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
                 onChange={(e) => setClientName(e.target.value)}
               />
             </div>
+
+            {/* Canvas mode selection */}
             <div className="field">
-              <label htmlFor="template-type">View</label>
-              <select
-                id="template-type"
-                value={templateType}
-                disabled={selectedTemplateId !== null}
-                onChange={(e) => setTemplateType(e.target.value as TemplateType)}
-              >
-                <option value="front">Front</option>
-                <option value="back">Back</option>
-                <option value="side">Side</option>
-                <option value="top">Top</option>
-              </select>
+              <label>Canvas type</label>
+              <div className="canvas-mode-toggle">
+                <label className={`canvas-mode-toggle__option${canvasMode === 'templates' ? ' canvas-mode-toggle__option--active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="canvas-mode"
+                    value="templates"
+                    checked={canvasMode === 'templates'}
+                    onChange={() => { setCanvasMode('templates'); setImageMissing(false); }}
+                  />
+                  Head Sheet Templates
+                </label>
+                <label className={`canvas-mode-toggle__option${canvasMode === 'image' ? ' canvas-mode-toggle__option--active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="canvas-mode"
+                    value="image"
+                    checked={canvasMode === 'image'}
+                    onChange={() => { setCanvasMode('image'); setSelectedTemplateId(null); setImageMissing(false); }}
+                  />
+                  Upload Image
+                </label>
+              </div>
             </div>
-            <div className="template-picker">
-              <div className="template-picker__header">
-                <label>Start from template</label>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => {
-                    setSelectedTemplateId(null)
-                    setTemplateType('front')
+
+            {/* Template type multi-select */}
+            {canvasMode === 'templates' && (
+              <>
+                <div className="field">
+                  <label>Views</label>
+                  <div className="template-type-grid">
+                    {ALL_TEMPLATE_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`template-type-card${selectedTypes.includes(type) ? ' template-type-card--active' : ''}`}
+                        onClick={() => toggleType(type)}
+                        aria-pressed={selectedTypes.includes(type)}
+                      >
+                        <div className="template-type-card__preview">
+                          <img src={`/templates/head-${type}.svg`} alt={`${type} view`} />
+                        </div>
+                        <span className="template-type-card__label">
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="template-picker">
+                  <div className="template-picker__header">
+                    <label>Start from template</label>
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      onClick={() => {
+                        setSelectedTemplateId(null)
+                      }}
+                    >
+                      Blank
+                    </button>
+                  </div>
+                  {templates.isLoading && <p className="template-picker__status">Loading templates…</p>}
+                  {templates.isError && <p className="template-picker__status template-picker__status--error">Failed to load templates.</p>}
+                  {!templates.isLoading && !templates.isError && (templates.data?.data ?? []).length === 0 && (
+                    <p className="template-picker__status">No saved templates yet.</p>
+                  )}
+                  <div className="template-picker__grid">
+                    {(templates.data?.data ?? []).map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        className={`template-picker__card ${selectedTemplateId === template.id ? 'template-picker__card--active' : ''}`}
+                        onClick={() => {
+                          setSelectedTemplateId(template.id)
+                        }}
+                        aria-pressed={selectedTemplateId === template.id}
+                      >
+                        <div className="template-picker__thumb">
+                          {template.thumbnailUrl ? (
+                            <img src={template.thumbnailUrl} alt="" loading="lazy" />
+                          ) : (
+                            <span>Preview</span>
+                          )}
+                        </div>
+                        <div className="template-picker__name">{template.name}</div>
+                        <div className="template-picker__meta">
+                          {template.templateType} view
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Image upload */}
+            {canvasMode === 'image' && (
+              <div className="field">
+                <label htmlFor="canvas-image">Image</label>
+                <input
+                  id="canvas-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setImageMissing(false)
+                    setIsReading(true)
+                    const reader = new FileReader()
+                    reader.onload = (ev) => {
+                      if (!mountedRef.current) return
+                      setImageDataUrl(ev.target?.result as string)
+                      setImageFileName(file.name)
+                      setIsReading(false)
+                    }
+                    reader.onerror = () => {
+                      if (!mountedRef.current) return
+                      setIsReading(false)
+                    }
+                    reader.readAsDataURL(file)
                   }}
-                >
-                  Blank
-                </button>
+                />
+                {imageFileName && <span className="field-hint">{imageFileName}</span>}
+                {imageMissing && <span className="field-error">Please select an image.</span>}
               </div>
-              {templates.isLoading && <p className="template-picker__status">Loading templates…</p>}
-              {templates.isError && <p className="template-picker__status template-picker__status--error">Failed to load templates.</p>}
-              {!templates.isLoading && !templates.isError && (templates.data?.data ?? []).length === 0 && (
-                <p className="template-picker__status">No saved templates yet.</p>
-              )}
-              <div className="template-picker__grid">
-                {(templates.data?.data ?? []).map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className={`template-picker__card ${selectedTemplateId === template.id ? 'template-picker__card--active' : ''}`}
-                    onClick={() => {
-                      setSelectedTemplateId(template.id)
-                      setTemplateType(template.templateType)
-                    }}
-                    aria-pressed={selectedTemplateId === template.id}
-                  >
-                    <div className="template-picker__thumb">
-                      {template.thumbnailUrl ? (
-                        <img src={template.thumbnailUrl} alt="" loading="lazy" />
-                      ) : (
-                        <span>Preview</span>
-                      )}
-                    </div>
-                    <div className="template-picker__name">{template.name}</div>
-                    <div className="template-picker__meta">
-                      {template.templateType} view
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {createSheet.isError && (
+            )}
+
+            {(createSheet.isError || saveImage.isError) && (
               <p className="field-error" role="alert">
                 Failed to create sheet. Please try again.
               </p>
@@ -145,8 +260,8 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
             <button type="button" className="btn btn--ghost" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn--primary" disabled={createSheet.isPending}>
-              {createSheet.isPending ? 'Creating…' : 'Create sheet'}
+            <button type="submit" className="btn btn--primary" disabled={isPending}>
+              {isPending ? 'Creating…' : 'Create sheet'}
             </button>
           </div>
         </form>

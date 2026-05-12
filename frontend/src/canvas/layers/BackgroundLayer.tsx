@@ -1,4 +1,5 @@
 import { Image as KonvaImage, Layer, Rect, Shape } from 'react-konva';
+import type { TemplateLayout } from '../utils/layoutEngine';
 import type { StageSize } from '../utils/canvasUtils';
 
 const GRID_SPACING = 30;
@@ -7,11 +8,14 @@ const GRID_STROKE_WIDTH = 0.5;
 
 interface BackgroundLayerProps {
   stageSize: StageSize;
-  templateImage: HTMLImageElement | null;
-  templateRect: { x: number; y: number; width: number; height: number } | null;
+  /** Template SVG layouts (templates canvas mode). */
+  layouts: TemplateLayout[];
+  /** Uploaded image for image-mode canvases. */
+  canvasImage?: HTMLImageElement | null;
+  canvasImageRect?: { x: number; y: number; width: number; height: number } | null;
 }
 
-export function BackgroundLayer({ stageSize, templateImage, templateRect }: BackgroundLayerProps) {
+export function BackgroundLayer({ stageSize, layouts, canvasImage, canvasImageRect }: BackgroundLayerProps) {
   return (
     <Layer listening={false}>
       <Rect x={0} y={0} width={stageSize.width} height={stageSize.height} fill="#ffffff" />
@@ -33,16 +37,27 @@ export function BackgroundLayer({ stageSize, templateImage, templateRect }: Back
           ctx.strokeShape(shape);
         }}
       />
-      {templateRect && templateImage && (
+      {canvasImage && canvasImageRect && (
         <KonvaImage
-          image={templateImage}
-          x={templateRect.x}
-          y={templateRect.y}
-          width={templateRect.width}
-          height={templateRect.height}
+          image={canvasImage}
+          x={canvasImageRect.x}
+          y={canvasImageRect.y}
+          width={canvasImageRect.width}
+          height={canvasImageRect.height}
           opacity={0.9}
         />
       )}
+      {layouts.map((layout) => (
+        <KonvaImage
+          key={layout.type}
+          image={layout.image}
+          x={layout.rect.x}
+          y={layout.rect.y}
+          width={layout.rect.width}
+          height={layout.rect.height}
+          opacity={0.9}
+        />
+      ))}
     </Layer>
   );
 }
