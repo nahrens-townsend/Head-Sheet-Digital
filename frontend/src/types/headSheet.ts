@@ -1,10 +1,16 @@
 export type TemplateType = 'front' | 'back' | 'side' | 'top'
 
+export type CanvasMode = 'templates' | 'image'
+
 export interface HeadSheet {
   id: string
   name: string
   clientName: string | null
+  /** Legacy single-template field — kept for backward compat. Prefer `templateTypes[0]`. */
   templateType: TemplateType
+  templateTypes: TemplateType[]
+  canvasMode: CanvasMode
+  imageDataUrl: string | null
   strokesJson: string
   thumbnailUrl: string | null
   createdAt: string
@@ -15,6 +21,7 @@ export interface HeadSheetSummary {
   id: string
   name: string
   clientName: string | null
+  /** Derived from `templateTypes[0]` for backward compat. */
   templateType: TemplateType
   thumbnailUrl: string | null
   updatedAt: string
@@ -24,6 +31,8 @@ export interface CreateHeadSheetPayload {
   name: string
   clientName?: string
   templateType: TemplateType
+  templateTypes?: TemplateType[]
+  canvasMode?: CanvasMode
   templateId?: string
 }
 

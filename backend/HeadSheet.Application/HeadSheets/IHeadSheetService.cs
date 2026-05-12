@@ -5,6 +5,9 @@ public record HeadSheetDto(
     string Name,
     string? ClientName,
     string TemplateType,
+    IReadOnlyList<string> TemplateTypes,
+    string CanvasMode,
+    string? ImageDataUrl,
     string StrokesJson,
     string? ThumbnailUrl,
     DateTime CreatedAt,
@@ -20,7 +23,13 @@ public record HeadSheetSummaryDto(
 
 public record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);
 
-public record CreateHeadSheetRequest(string Name, string? ClientName, string TemplateType, Guid? TemplateId);
+public record CreateHeadSheetRequest(
+    string Name,
+    string? ClientName,
+    string TemplateType,
+    Guid? TemplateId,
+    IReadOnlyList<string>? TemplateTypes = null,
+    string? CanvasMode = null);
 public record UpdateHeadSheetRequest(string Name, string? ClientName);
 public record SaveStrokesRequest(string StrokesJson);
 
@@ -48,6 +57,8 @@ public interface IHeadSheetService
 
     Task<SaveThumbnailResult> SaveThumbnailAsync(
         Guid userId, Guid id, string thumbnailUrl, DateTime expectedUpdatedAt, CancellationToken ct = default);
+
+    Task<HeadSheetDto?> SaveImageAsync(Guid userId, Guid id, string imageDataUrl, CancellationToken ct = default);
 
     Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default);
 }

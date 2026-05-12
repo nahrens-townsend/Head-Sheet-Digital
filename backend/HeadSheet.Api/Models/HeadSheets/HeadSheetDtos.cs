@@ -6,7 +6,9 @@ public record CreateHeadSheetRequestDto(
     [MaxLength(200)] string Name,
     [MaxLength(200)] string? ClientName,
     [Required, RegularExpression("^(front|back|side|top)$", ErrorMessage = "templateType must be front, back, side, or top.")] string TemplateType,
-    Guid? TemplateId);
+    Guid? TemplateId,
+    IReadOnlyList<string>? TemplateTypes,
+    [RegularExpression("^(templates|image)$", ErrorMessage = "canvasMode must be 'templates' or 'image'.")] string? CanvasMode);
 
 public record UpdateHeadSheetRequestDto(
     [Required, MaxLength(200)] string Name,
@@ -17,6 +19,9 @@ public record HeadSheetResponseDto(
     string Name,
     string? ClientName,
     string TemplateType,
+    IReadOnlyList<string> TemplateTypes,
+    string CanvasMode,
+    string? ImageDataUrl,
     string StrokesJson,
     string? ThumbnailUrl,
     DateTime CreatedAt,
@@ -38,3 +43,6 @@ public record SaveStrokesRequestDto([Required, MaxLength(5_000_000)] string Stro
 public record SaveThumbnailRequestDto(
     [Required, MaxLength(200_000)] string ThumbnailDataUrl,
     [Required] DateTime ExpectedUpdatedAt);
+
+// 10 MB cap for image data URLs
+public record SaveImageRequestDto([Required, MaxLength(10_000_000)] string ImageDataUrl);

@@ -1,6 +1,7 @@
 using HeadSheet.Application.Interfaces;
 using HeadSheetEntity = HeadSheet.Domain.Entities.HeadSheet;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace HeadSheet.Application.HeadSheets;
 
@@ -35,6 +36,8 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return sheet is null ? null : ToDto(sheet);
     }
 
+    private static readonly HashSet<string> AllowedTemplateTypes = ["front", "back", "side", "top"];
+
     public async Task<HeadSheetDto?> CreateAsync(
         Guid userId, CreateHeadSheetRequest request, CancellationToken ct = default)
     {
@@ -47,13 +50,33 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         }
 
         var now = NormalizeUtc(DateTime.UtcNow);
+
+        // Determine effective TemplateType (legacy single) and TemplateTypesJson
+        string effectiveTemplateType = template?.TemplateType ?? request.TemplateType;
+        string? templateTypesJson = null;
+        if (request.TemplateTypes is { Count: > 0 })
+        {
+            // Defense-in-depth: reject any item that is not a known template type.
+            if (request.TemplateTypes.Any(t => !AllowedTemplateTypes.Contains(t)))
+                return null;
+
+            templateTypesJson = JsonSerializer.Serialize(request.TemplateTypes);
+            effectiveTemplateType = request.TemplateTypes[0];
+        }
+        else if (template?.TemplateTypesJson is not null)
+        {
+            templateTypesJson = template.TemplateTypesJson;
+        }
+
         var sheet = new HeadSheetEntity
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             Name = string.IsNullOrWhiteSpace(request.Name) ? "Untitled Sheet" : request.Name.Trim(),
             ClientName = string.IsNullOrWhiteSpace(request.ClientName) ? null : request.ClientName.Trim(),
-            TemplateType = template?.TemplateType ?? request.TemplateType,
+            TemplateType = effectiveTemplateType,
+            TemplateTypesJson = templateTypesJson,
+            CanvasMode = request.CanvasMode ?? "templates",
             StrokesJson = "[]",
             ThumbnailUrl = null,
             IsTemplate = false,
@@ -134,6 +157,21 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return new SaveThumbnailResult(SaveThumbnailStatus.Conflict, ToDto(current));
     }
 
+    public async Task<HeadSheetDto?> SaveImageAsync(
+        Guid userId, Guid id, string imageDataUrl, CancellationToken ct = default)
+    {
+        var sheet = await db.HeadSheets
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == userId && !h.IsTemplate && h.CanvasMode == "image", ct);
+
+        if (sheet is null) return null;
+
+        sheet.ImageDataUrl = imageDataUrl;
+        sheet.UpdatedAt = NormalizeUtc(DateTime.UtcNow);
+
+        await db.SaveChangesAsync(ct);
+        return ToDto(sheet);
+    }
+
     public async Task<bool> DeleteAsync(Guid userId, Guid id, CancellationToken ct = default)
     {
         var now = NormalizeUtc(DateTime.UtcNow);
@@ -146,8 +184,19 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         return affected > 0;
     }
 
+    private static IReadOnlyList<string> ResolveTemplateTypes(HeadSheetEntity h)
+    {
+        if (h.TemplateTypesJson is not null)
+        {
+            try { return JsonSerializer.Deserialize<List<string>>(h.TemplateTypesJson) ?? [h.TemplateType]; }
+            catch { /* fall through */ }
+        }
+        return [h.TemplateType];
+    }
+
     private static HeadSheetDto ToDto(HeadSheetEntity h) =>
-        new(h.Id, h.Name, h.ClientName, h.TemplateType, h.StrokesJson, h.ThumbnailUrl, h.CreatedAt, h.UpdatedAt);
+        new(h.Id, h.Name, h.ClientName, h.TemplateType, ResolveTemplateTypes(h),
+            h.CanvasMode, h.ImageDataUrl, h.StrokesJson, h.ThumbnailUrl, h.CreatedAt, h.UpdatedAt);
 
     private static DateTime NormalizeUtc(DateTime value)
     {

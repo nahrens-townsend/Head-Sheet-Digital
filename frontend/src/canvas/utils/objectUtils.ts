@@ -27,5 +27,13 @@ export function duplicateObject(obj: CanvasObject): CanvasObject {
         createdAt,
         points: obj.points.map((v) => v + DUPLICATE_OFFSET),
       }
+    case 'note':
+      return {
+        ...obj,
+        id,
+        createdAt,
+        x: obj.x + DUPLICATE_OFFSET,
+        y: obj.y + DUPLICATE_OFFSET,
+      }
   }
 }

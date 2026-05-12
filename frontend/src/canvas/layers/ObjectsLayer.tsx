@@ -58,6 +58,10 @@ function getObjectBoundsNorm(
     if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 1, maxY: 1 }
     return { minX, minY, maxX, maxY }
   }
+  if (obj.type === 'note') {
+    // Notes are rendered as DOM overlay; treat as always-visible point.
+    return { minX: obj.x, minY: obj.y, maxX: obj.x, maxY: obj.y }
+  }
   // line / arrow / dotted — bounding box of the three bezier control points
   return {
     minX: Math.min(obj.start.x, obj.mid.x, obj.end.x),

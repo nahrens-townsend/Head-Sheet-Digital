@@ -47,7 +47,7 @@ export function HeadSheetEditor() {
 
   useAutoSave(
     sheetId,
-    { version: 2, objects },
+    { version: 3, objects },
     async (canvasData) => {
       const res = await saveMutation.mutateAsync(canvasData)
       if (!res.success || !res.data) {
@@ -166,7 +166,7 @@ export function HeadSheetEditor() {
       await createTemplateMutation.mutateAsync({
         name,
         templateType: sheet.templateType,
-        canvasData: { version: 2, objects },
+        canvasData: { version: 3, objects },
         thumbnailDataUrl: thumbnailDataUrl ?? undefined,
       })
       setShowSaveTemplate(false)

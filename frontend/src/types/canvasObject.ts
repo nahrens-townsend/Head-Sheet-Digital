@@ -26,17 +26,34 @@ export interface LineObject extends BaseCanvasObject {
   start: { x: number; y: number }
   mid: { x: number; y: number }
   end: { x: number; y: number }
+  /** Id of the mirrored twin, present only when created by the symmetry tool. */
+  mirrorId?: string
 }
 
-export type CanvasObject = PenStrokeObject | EraserStrokeObject | LineObject
+export interface NoteObject extends BaseCanvasObject {
+  type: 'note'
+  /** Normalized [0, 1] horizontal position in canvas space. */
+  x: number
+  /** Normalized [0, 1] vertical position in canvas space. */
+  y: number
+  text: string
+  noteColor: 'yellow' | 'pink' | 'green' | 'blue'
+}
+
+export type CanvasObject = PenStrokeObject | EraserStrokeObject | LineObject | NoteObject
 
 /** Narrows any CanvasObject to the LineObject family (line / arrow / dotted). */
 export function isLineObject(obj: CanvasObject): obj is LineObject {
   return obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted'
 }
 
+/** Narrows any CanvasObject to NoteObject. */
+export function isNoteObject(obj: CanvasObject): obj is NoteObject {
+  return obj.type === 'note'
+}
+
 export interface CanvasData {
-  version: 2
+  version: 3
   objects: CanvasObject[]
 }
 
@@ -95,12 +112,23 @@ function migrateStroke(stroke: Stroke): CanvasObject {
   } satisfies PenStrokeObject
 }
 
-/** Parse server JSON (v1 Stroke[] or v2 CanvasData) into a CanvasData object. */
+/** Parse server JSON (v1 Stroke[] or v2/v3 CanvasData) into a CanvasData object. */
 export function parseCanvasData(json: string): CanvasData {
   try {
     const parsed = JSON.parse(json) as unknown
 
-    // v2: has version + a valid objects array
+    // v3: current version
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      (parsed as { version?: unknown }).version === 3 &&
+      Array.isArray((parsed as { objects?: unknown }).objects)
+    ) {
+      return parsed as CanvasData
+    }
+
+    // v2: upgrade to v3 (no-op — NoteObject and mirrorId are both optional additions)
     if (
       parsed !== null &&
       typeof parsed === 'object' &&
@@ -108,13 +136,16 @@ export function parseCanvasData(json: string): CanvasData {
       (parsed as { version?: unknown }).version === 2 &&
       Array.isArray((parsed as { objects?: unknown }).objects)
     ) {
-      return parsed as CanvasData
+      return {
+        version: 3,
+        objects: (parsed as { objects: CanvasObject[] }).objects,
+      }
     }
 
     // v1: flat Stroke array
     if (Array.isArray(parsed)) {
       return {
-        version: 2,
+        version: 3,
         objects: (parsed as Stroke[]).map(migrateStroke),
       }
     }
@@ -122,5 +153,5 @@ export function parseCanvasData(json: string): CanvasData {
     // fall through
   }
 
-  return { version: 2, objects: [] }
+  return { version: 3, objects: [] }
 }
