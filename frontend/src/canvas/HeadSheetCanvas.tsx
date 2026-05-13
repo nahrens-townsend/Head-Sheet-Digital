@@ -25,6 +25,7 @@ import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
 import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
+import { ImageCanvasLayer } from './layers/ImageCanvasLayer';
 import { GuideLayer } from './layers/GuideLayer';
 import { NotesExportLayer } from './layers/NotesExportLayer';
 import { NotesOverlay } from './layers/NotesOverlay';
@@ -97,8 +98,6 @@ interface HeadSheetCanvasProps {
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void;
   onDeleteObjects: (ids: string[]) => void;
 }
-
-type TemplateRect = { x: number; y: number; width: number; height: number };
 
 export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvasProps>(
   function HeadSheetCanvas(
@@ -334,8 +333,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const templateImages = useTemplateImages(canvasMode === 'templates' ? templateTypes : []);
 
     // Compute layout rects for all templates in the current stage.
-    // Guard on canvasMode so stale templateImages from a prior templates-mode sheet
-    // don't bleed through when the same component instance switches to image mode.
     const layouts = useMemo(
       () =>
         canvasMode === 'templates'
@@ -343,47 +340,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           : [],
       [canvasMode, templateTypes, templateImages, stageSize],
     );
-
-    // Load the uploaded image for image-mode canvases.
-    const [canvasImage, setCanvasImage] = useState<HTMLImageElement | null>(null);
-    useEffect(() => {
-      if (canvasMode !== 'image' || !imageDataUrl) {
-        return;
-      }
-      let mounted = true;
-      const img = new window.Image();
-      img.onload = () => {
-        if (mounted) setCanvasImage(img);
-      };
-      img.onerror = () => {
-        if (mounted) setCanvasImage(null);
-      };
-      img.src = imageDataUrl;
-      return () => {
-        mounted = false;
-      };
-    }, [canvasMode, imageDataUrl]);
-    // Derive effective image: null when not in image mode or when no URL is set,
-    // so stale canvasImage state never bleeds between sheets in image mode.
-    const effectiveCanvasImage = canvasMode === 'image' && !!imageDataUrl ? canvasImage : null;
-
-    // Centre the canvas image within the stage for image mode.
-    const canvasImageRect = useMemo<TemplateRect | null>(() => {
-      if (!effectiveCanvasImage) return null;
-      const naturalWidth = effectiveCanvasImage.naturalWidth || 800;
-      const naturalHeight = effectiveCanvasImage.naturalHeight || 600;
-      const scale = Math.min(stageSize.width / naturalWidth, stageSize.height / naturalHeight);
-      const width = naturalWidth * scale;
-      const height = naturalHeight * scale;
-      return {
-        x: (stageSize.width - width) / 2,
-        y: (stageSize.height - height) / 2,
-        width,
-        height,
-      };
-    }, [effectiveCanvasImage, stageSize.width, stageSize.height]);
-
-    const strokePixelWidth = STROKE_SIZES[strokeSize];
 
     const resolvedGuidePoints = useMemo(
       () => (canvasMode === 'templates' && showGuides ? resolveGuidePoints(layouts) : []),
@@ -397,6 +353,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       12,
       resolvedGuidePoints,
     );
+
+    const strokePixelWidth = STROKE_SIZES[strokeSize];
 
     const exportStage = useCallback(
       (maxDimension?: number) => {
@@ -545,12 +503,11 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             if (!isPinchingRef.current) (rawHandlers.onPointerUp as StagePointerHandler)(e);
           }}
         >
-          <BackgroundLayer
-            stageSize={stageSize}
-            layouts={layouts}
-            canvasImage={effectiveCanvasImage}
-            canvasImageRect={canvasImageRect}
-          />
+          {canvasMode === 'templates' ? (
+            <BackgroundLayer stageSize={stageSize} layouts={layouts} />
+          ) : (
+            <ImageCanvasLayer dataUrl={imageDataUrl ?? ''} stageSize={stageSize} />
+          )}
           <GuideLayer layouts={layouts} showGuides={showGuides} isExporting={isExporting} />
           <ObjectsLayer
             objects={objects}

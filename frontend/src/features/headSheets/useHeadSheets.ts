@@ -61,9 +61,14 @@ export function useDeleteHeadSheet() {
 }
 
 export function useSaveImage() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, imageDataUrl }: { id: string; imageDataUrl: string }) =>
       headSheetsApi.saveImage(id, imageDataUrl),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: [...SHEETS_KEY, vars.id] })
+      qc.invalidateQueries({ queryKey: SHEETS_KEY })
+    },
   })
 }
 

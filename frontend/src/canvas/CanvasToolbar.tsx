@@ -1,15 +1,18 @@
 import { useCanvasStore } from '../stores/canvasStore'
 import { ColorPicker } from '../components/ColorPicker/ColorPicker'
 import { StrokeSizePicker } from '../components/BrushSizeSlider/StrokeSizePicker'
+import type { CanvasMode } from '../types/headSheet'
 
 interface CanvasToolbarProps {
   canUndo: boolean
   canRedo: boolean
   canSaveTemplate: boolean
+  canvasMode: CanvasMode
   onUndo: () => void
   onRedo: () => void
   onExport: () => void
   onSaveTemplate: () => void
+  onReplaceImage: () => void
   saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   sheetName: string
   onBack: () => void
@@ -26,10 +29,12 @@ export function CanvasToolbar({
   canUndo,
   canRedo,
   canSaveTemplate,
+  canvasMode,
   onUndo,
   onRedo,
   onExport,
   onSaveTemplate,
+  onReplaceImage,
   saveStatus,
   sheetName,
   onBack,
@@ -135,6 +140,18 @@ export function CanvasToolbar({
           ⊕
         </button>
 
+        {canvasMode === 'image' && (
+          <button
+            type="button"
+            className="toolbar-btn"
+            onClick={onReplaceImage}
+            aria-label="Replace image"
+            title="Replace image"
+          >
+            🖼
+          </button>
+        )}
+
         <button
           type="button"
           className="toolbar-btn"
@@ -144,16 +161,18 @@ export function CanvasToolbar({
         >
           ⤓
         </button>
-        <button
-          type="button"
-          className="toolbar-btn"
-          onClick={onSaveTemplate}
-          disabled={!canSaveTemplate}
-          aria-label="Save as template"
-          title="Save as template"
-        >
-          ★
-        </button>
+        {canvasMode === 'templates' && (
+          <button
+            type="button"
+            className="toolbar-btn"
+            onClick={onSaveTemplate}
+            disabled={!canSaveTemplate}
+            aria-label="Save as template"
+            title="Save as template"
+          >
+            ★
+          </button>
+        )}
 
         <span className="toolbar-sep" aria-hidden="true" />
 

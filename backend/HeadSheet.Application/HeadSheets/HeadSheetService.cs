@@ -50,6 +50,7 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
         }
 
         var now = NormalizeUtc(DateTime.UtcNow);
+        var canvasMode = request.CanvasMode ?? "templates";
 
         // Determine effective TemplateType (legacy single) and TemplateTypesJson
         string effectiveTemplateType = template?.TemplateType ?? request.TemplateType;
@@ -76,7 +77,8 @@ public class HeadSheetService(IAppDbContext db) : IHeadSheetService
             ClientName = string.IsNullOrWhiteSpace(request.ClientName) ? null : request.ClientName.Trim(),
             TemplateType = effectiveTemplateType,
             TemplateTypesJson = templateTypesJson,
-            CanvasMode = request.CanvasMode ?? "templates",
+            CanvasMode = canvasMode,
+            ImageDataUrl = canvasMode == "image" ? request.ImageDataUrl : null,
             StrokesJson = "[]",
             ThumbnailUrl = null,
             IsTemplate = false,

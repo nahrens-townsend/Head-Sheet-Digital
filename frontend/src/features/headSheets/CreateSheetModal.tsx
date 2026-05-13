@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import type { CanvasMode, TemplateType } from '../../types/headSheet'
-import { useCreateHeadSheet, useSaveImage, useTemplates } from './useHeadSheets'
+import { useCreateHeadSheet, useTemplates } from './useHeadSheets'
 
 const ALL_TEMPLATE_TYPES: TemplateType[] = ['front', 'back', 'side', 'top']
 
@@ -20,7 +20,6 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
   const [imageMissing, setImageMissing] = useState(false)
   const [isReading, setIsReading] = useState(false)
   const createSheet = useCreateHeadSheet()
-  const saveImage = useSaveImage()
   const templates = useTemplates()
   const nameRef = useRef<HTMLInputElement>(null)
   const mountedRef = useRef(true)
@@ -55,6 +54,7 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
         templateType: selectedTypes[0] ?? 'front',
         templateTypes: canvasMode === 'templates' ? selectedTypes : undefined,
         canvasMode,
+        imageDataUrl: canvasMode === 'image' ? (imageDataUrl ?? undefined) : undefined,
         templateId: canvasMode === 'templates' ? (selectedTemplateId ?? undefined) : undefined,
       })
       if (res.success && res.data) {
@@ -67,14 +67,6 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
 
     if (!createdId) return
 
-    if (canvasMode === 'image' && imageDataUrl) {
-      try {
-        await saveImage.mutateAsync({ id: createdId, imageDataUrl })
-      } catch {
-        // saveImage.isError displays the error; sheet was created — navigate anyway
-      }
-    }
-
     onCreated(createdId)
   }
 
@@ -82,7 +74,7 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
     if (e.target === e.currentTarget) onClose()
   }
 
-  const isPending = createSheet.isPending || saveImage.isPending || isReading
+  const isPending = createSheet.isPending || isReading
 
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick} role="presentation">
@@ -250,7 +242,7 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
               </div>
             )}
 
-            {(createSheet.isError || saveImage.isError) && (
+            {createSheet.isError && (
               <p className="field-error" role="alert">
                 Failed to create sheet. Please try again.
               </p>

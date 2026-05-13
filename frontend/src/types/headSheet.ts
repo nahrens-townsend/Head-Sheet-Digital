@@ -33,6 +33,7 @@ export interface CreateHeadSheetPayload {
   templateType: TemplateType
   templateTypes?: TemplateType[]
   canvasMode?: CanvasMode
+  imageDataUrl?: string
   templateId?: string
 }
 

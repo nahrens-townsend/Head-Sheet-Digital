@@ -21,7 +21,7 @@ export function GuideLayer({ layouts, showGuides, isExporting = false }: GuideLa
   return (
     <Layer listening={false}>
       {/* Dashed vertical center-axis line per template */}
-      {/* {layouts.map((layout) => {
+      {layouts.map((layout) => {
         const cx = layout.rect.x + layout.rect.width * 0.5
         return (
           <Line
@@ -34,7 +34,7 @@ export function GuideLayer({ layouts, showGuides, isExporting = false }: GuideLa
             listening={false}
           />
         )
-      })} */}
+      })}
 
       {/* Guide point dots */}
       {resolvedPoints.map((pt) => (

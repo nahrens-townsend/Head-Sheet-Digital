@@ -29,7 +29,8 @@ public record CreateHeadSheetRequest(
     string TemplateType,
     Guid? TemplateId,
     IReadOnlyList<string>? TemplateTypes = null,
-    string? CanvasMode = null);
+    string? CanvasMode = null,
+    string? ImageDataUrl = null);
 public record UpdateHeadSheetRequest(string Name, string? ClientName);
 public record SaveStrokesRequest(string StrokesJson);
 

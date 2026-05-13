@@ -10,7 +10,7 @@ import { parseCanvasData } from '../../types/canvasObject'
 import { duplicateObject } from '../../canvas/utils/objectUtils'
 import type { HeadSheetCanvasHandle } from '../../canvas/HeadSheetCanvas'
 import { SaveTemplateModal } from './SaveTemplateModal'
-import { useCreateTemplate, useGetHeadSheet, useSaveStrokes, useSaveThumbnail } from './useHeadSheets'
+import { useCreateTemplate, useGetHeadSheet, useSaveImage, useSaveStrokes, useSaveThumbnail } from './useHeadSheets'
 
 export function HeadSheetEditor() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +18,7 @@ export function HeadSheetEditor() {
   const sheetId = id ?? ''
   const initializedSheetIdRef = useRef<string | null>(null)
   const canvasRef = useRef<HeadSheetCanvasHandle | null>(null)
+  const replaceImageInputRef = useRef<HTMLInputElement | null>(null)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const { data, isLoading, isError } = useGetHeadSheet(sheetId)
   const { addObject, updateObject, deleteObjects, undo, redo, canUndo, canRedo, objects, setObjects } =
@@ -26,6 +27,7 @@ export function HeadSheetEditor() {
   const { selectedObjectIds, setSelectedObjectIds, setZoom, setPanOffset } = useCanvasStore()
   const saveMutation = useSaveStrokes(sheetId)
   const saveThumbnailMutation = useSaveThumbnail(sheetId)
+  const saveImageMutation = useSaveImage()
   const createTemplateMutation = useCreateTemplate()
 
   useEffect(() => {
@@ -175,6 +177,34 @@ export function HeadSheetEditor() {
     }
   }
 
+  async function readAsDataUrl(file: File): Promise<string> {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result === 'string') {
+          resolve(result)
+          return
+        }
+        reject(new Error('Failed to read image file.'))
+      }
+      reader.onerror = () => reject(new Error('Failed to read image file.'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handleReplaceImageFile(file: File) {
+    try {
+      const imageDataUrl = await readAsDataUrl(file)
+      const res = await saveImageMutation.mutateAsync({ id: sheetId, imageDataUrl })
+      if (!res.success) {
+        throw new Error(res.error ?? 'Failed to save image.')
+      }
+    } catch (error) {
+      console.error('Failed to replace image.', error)
+    }
+  }
+
   if (isLoading) {
     return <div className="editor-loading">Loading…</div>
   }
@@ -191,13 +221,30 @@ export function HeadSheetEditor() {
         canUndo={canUndo}
         canRedo={canRedo}
         canSaveTemplate={objects.length > 0}
+        canvasMode={sheet.canvasMode}
         onUndo={undo}
         onRedo={redo}
         onExport={handleExport}
         onSaveTemplate={() => setShowSaveTemplate(true)}
+        onReplaceImage={() => {
+          if (sheet.canvasMode !== 'image') return
+          replaceImageInputRef.current?.click()
+        }}
         saveStatus={saveStatus}
         sheetName={sheet.name}
         onBack={() => navigate('/sheets')}
+      />
+      <input
+        ref={replaceImageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          await handleReplaceImageFile(file)
+          e.currentTarget.value = ''
+        }}
       />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas

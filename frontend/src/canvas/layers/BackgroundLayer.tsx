@@ -10,12 +10,9 @@ interface BackgroundLayerProps {
   stageSize: StageSize;
   /** Template SVG layouts (templates canvas mode). */
   layouts: TemplateLayout[];
-  /** Uploaded image for image-mode canvases. */
-  canvasImage?: HTMLImageElement | null;
-  canvasImageRect?: { x: number; y: number; width: number; height: number } | null;
 }
 
-export function BackgroundLayer({ stageSize, layouts, canvasImage, canvasImageRect }: BackgroundLayerProps) {
+export function BackgroundLayer({ stageSize, layouts }: BackgroundLayerProps) {
   return (
     <Layer listening={false}>
       <Rect x={0} y={0} width={stageSize.width} height={stageSize.height} fill="#ffffff" />
@@ -37,16 +34,6 @@ export function BackgroundLayer({ stageSize, layouts, canvasImage, canvasImageRe
           ctx.strokeShape(shape);
         }}
       />
-      {canvasImage && canvasImageRect && (
-        <KonvaImage
-          image={canvasImage}
-          x={canvasImageRect.x}
-          y={canvasImageRect.y}
-          width={canvasImageRect.width}
-          height={canvasImageRect.height}
-          opacity={0.9}
-        />
-      )}
       {layouts.map((layout) => (
         <KonvaImage
           key={layout.type}

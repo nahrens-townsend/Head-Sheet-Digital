@@ -58,6 +58,7 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
     {
         var userId = User.GetUserId();
         if (userId is null) return Unauthorized();
+        var canvasMode = dto.CanvasMode ?? "templates";
 
         if (dto.TemplateTypes is not null)
         {
@@ -69,9 +70,38 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
             }
         }
 
+        if (canvasMode == "image")
+        {
+            if (string.IsNullOrWhiteSpace(dto.ImageDataUrl))
+            {
+                return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>(
+                    "imageDataUrl is required when canvasMode is 'image'."));
+            }
+            if (!dto.ImageDataUrl.StartsWith("data:image/", StringComparison.Ordinal))
+            {
+                return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>(
+                    "imageDataUrl must be an image data URL."));
+            }
+        }
+        else
+        {
+            if (dto.TemplateTypes is null || dto.TemplateTypes.Count == 0)
+            {
+                return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>(
+                    "templateTypes must be provided and non-empty when canvasMode is 'templates'."));
+            }
+        }
+
         var sheet = await headSheetService.CreateAsync(
             userId.Value,
-            new CreateHeadSheetRequest(dto.Name ?? "Untitled Sheet", dto.ClientName, dto.TemplateType ?? "front", dto.TemplateId, dto.TemplateTypes, dto.CanvasMode),
+            new CreateHeadSheetRequest(
+                dto.Name ?? "Untitled Sheet",
+                dto.ClientName,
+                dto.TemplateType ?? "front",
+                dto.TemplateId,
+                dto.TemplateTypes,
+                dto.CanvasMode,
+                dto.ImageDataUrl),
             ct);
 
         if (sheet is null && dto.TemplateId is not null)
@@ -157,6 +187,17 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
         var userId = User.GetUserId();
         if (userId is null) return Unauthorized();
 
+        var existing = await headSheetService.GetAsync(userId.Value, id, ct);
+        if (existing is null)
+        {
+            return NotFound(ApiResponse.Fail<HeadSheetResponseDto>("Head sheet not found."));
+        }
+        if (!string.Equals(existing.CanvasMode, "image", StringComparison.Ordinal))
+        {
+            return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>(
+                "Cannot update image unless canvasMode is 'image'."));
+        }
+
         if (!dto.ImageDataUrl.StartsWith("data:image/", StringComparison.Ordinal))
         {
             return BadRequest(ApiResponse.Fail<HeadSheetResponseDto>("imageDataUrl must be an image data URL."));
@@ -166,8 +207,7 @@ public class HeadSheetsController(IHeadSheetService headSheetService) : Controll
 
         if (sheet is null)
         {
-            return NotFound(ApiResponse.Fail<HeadSheetResponseDto>(
-                "Head sheet not found or is not in image mode."));
+            return NotFound(ApiResponse.Fail<HeadSheetResponseDto>("Head sheet not found."));
         }
 
         return Ok(ApiResponse.Ok(ToResponse(sheet)));

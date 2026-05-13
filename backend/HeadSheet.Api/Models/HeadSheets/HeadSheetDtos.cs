@@ -8,7 +8,8 @@ public record CreateHeadSheetRequestDto(
     [Required, RegularExpression("^(front|back|side|top)$", ErrorMessage = "templateType must be front, back, side, or top.")] string TemplateType,
     Guid? TemplateId,
     IReadOnlyList<string>? TemplateTypes,
-    [RegularExpression("^(templates|image)$", ErrorMessage = "canvasMode must be 'templates' or 'image'.")] string? CanvasMode);
+    [RegularExpression("^(templates|image)$", ErrorMessage = "canvasMode must be 'templates' or 'image'.")] string? CanvasMode,
+    [MaxLength(10_000_000)] string? ImageDataUrl);
 
 public record UpdateHeadSheetRequestDto(
     [Required, MaxLength(200)] string Name,
