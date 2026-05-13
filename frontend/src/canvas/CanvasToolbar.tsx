@@ -72,6 +72,15 @@ export function CanvasToolbar({
         </button>
         <button
           type="button"
+          className={`toolbar-btn ${tool === 'symmetry-line' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('symmetry-line')}
+          aria-label="Symmetry line tool"
+          title="Symmetry line"
+        >
+          ⇔
+        </button>
+        <button
+          type="button"
           className={`toolbar-btn ${tool === 'line' ? 'toolbar-btn--active' : ''}`}
           onClick={() => setTool('line')}
           aria-label="Line tool"

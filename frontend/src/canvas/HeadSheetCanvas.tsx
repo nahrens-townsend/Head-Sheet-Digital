@@ -19,6 +19,7 @@ import { useLineTool } from './tools/useLineTool';
 import { useArrowLineTool } from './tools/useArrowLineTool';
 import { useDottedLineTool } from './tools/useDottedLineTool';
 import { useNoteTool } from './tools/useNoteTool';
+import { useSymmetryLineTool } from './tools/useSymmetryLineTool';
 import { usePenTool } from './tools/usePenTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
@@ -95,6 +96,7 @@ interface HeadSheetCanvasProps {
   canvasMode: CanvasMode;
   imageDataUrl?: string | null;
   onObjectComplete: (object: CanvasObject) => void;
+  onObjectsComplete: (objects: CanvasObject[]) => void;
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void;
   onDeleteObjects: (ids: string[]) => void;
 }
@@ -107,6 +109,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       canvasMode,
       imageDataUrl,
       onObjectComplete,
+      onObjectsComplete,
       onUpdateObject,
       onDeleteObjects,
     },
@@ -426,6 +429,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       onObjectComplete,
     });
 
+    const symmetryTool = useSymmetryLineTool({
+      ...commonVectorOpts,
+      layouts,
+      onObjectsComplete,
+    });
+
     const lineTool = useLineTool(commonVectorOpts);
     const arrowTool = useArrowLineTool(commonVectorOpts);
     const dottedTool = useDottedLineTool(commonVectorOpts);
@@ -457,6 +466,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return noteTool;
         case 'line':
           return lineTool;
+        case 'symmetry-line':
+          return symmetryTool;
         case 'arrow':
           return arrowTool;
         case 'dotted':
@@ -469,11 +480,11 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         default:
           return penTool;
       }
-    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, penTool, selectTool, tool]);
+    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, penTool, selectTool, symmetryTool, tool]);
 
     const activePreviewPoints =
-      tool === 'line'
-        ? lineTool.previewPoints
+      tool === 'line' || tool === 'symmetry-line'
+        ? (tool === 'line' ? lineTool : symmetryTool).previewPoints
         : tool === 'arrow'
           ? arrowTool.previewPoints
           : tool === 'dotted'

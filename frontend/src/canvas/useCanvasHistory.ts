@@ -16,9 +16,12 @@ export type DeleteOperation = {
   type: 'delete'
   deletions: Array<{ index: number; object: CanvasObject }>
 }
-// Multiple pen/eraser strokes drawn in quick succession are grouped so a single
-// Ctrl+Z undoes the whole gesture sequence.
-export type BatchOperation = { type: 'batch'; ops: AddOperation[] }
+// Multiple operations grouped so a single Ctrl+Z undoes them all.
+// Used for pen/eraser burst-strokes AND symmetry pairs (add or update).
+export type BatchOperation = {
+  type: 'batch'
+  ops: (AddOperation | UpdateOperation | DeleteOperation)[]
+}
 
 export type CanvasOperation =
   | AddOperation
@@ -171,6 +174,61 @@ export function useCanvasHistory() {
     [consumePendingBatch],
   )
 
+  // ── addObjects (batch) ────────────────────────────────────────────────────
+
+  const addObjects = useCallback(
+    (newObjects: CanvasObject[]) => {
+      if (newObjects.length === 0) return
+      const pendingOp = consumePendingBatch()
+      setHistory((cur) => {
+        const ops: AddOperation[] = newObjects.map((object) => ({ type: 'add', object }))
+        const batchOp: BatchOperation = { type: 'batch', ops }
+        let undoStack = cur.undoStack
+        if (pendingOp) undoStack = [...undoStack, pendingOp]
+        return {
+          objects: [...cur.objects, ...newObjects],
+          undoStack: [...undoStack, batchOp].slice(-MAX_HISTORY_ENTRIES),
+          redoStack: [],
+          hasPendingBatch: false,
+        }
+      })
+    },
+    [consumePendingBatch],
+  )
+
+  // ── updateObjectsBatch ────────────────────────────────────────────────────
+
+  const updateObjectsBatch = useCallback(
+    (updates: Array<{ id: string; updater: (obj: CanvasObject) => CanvasObject }>) => {
+      if (updates.length === 0) return
+      const pendingOp = consumePendingBatch()
+      setHistory((cur) => {
+        const ops: UpdateOperation[] = []
+        let nextObjects = cur.objects
+        for (const { id, updater } of updates) {
+          const idx = nextObjects.findIndex((o) => o.id === id)
+          if (idx === -1) continue
+          const before = nextObjects[idx]
+          const after = updater(before)
+          ops.push({ type: 'update', id, before, after })
+          nextObjects = [...nextObjects]
+          nextObjects[idx] = after
+        }
+        if (ops.length === 0) return cur
+        const batchOp: BatchOperation = { type: 'batch', ops }
+        let undoStack = cur.undoStack
+        if (pendingOp) undoStack = [...undoStack, pendingOp]
+        return {
+          objects: nextObjects,
+          undoStack: [...undoStack, batchOp].slice(-MAX_HISTORY_ENTRIES),
+          redoStack: [],
+          hasPendingBatch: false,
+        }
+      })
+    },
+    [consumePendingBatch],
+  )
+
   // ── updateObject ──────────────────────────────────────────────────────────
 
   const updateObject = useCallback(
@@ -292,7 +350,9 @@ export function useCanvasHistory() {
     canUndo: history.undoStack.length > 0 || history.hasPendingBatch,
     canRedo: history.redoStack.length > 0,
     addObject,
+    addObjects,
     updateObject,
+    updateObjectsBatch,
     deleteObjects,
     undo,
     redo,
