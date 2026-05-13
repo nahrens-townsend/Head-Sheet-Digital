@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import type React from 'react'
 import Konva from 'konva'
 import type { LineObject } from '../../types/canvasObject'
@@ -62,7 +62,7 @@ export function useSymmetryLineTool({
     [stageSize, layouts, onObjectsComplete],
   )
 
-  return useVectorLineTool({
+  const base = useVectorLineTool({
     type: 'line',
     stageRef,
     stageSize,
@@ -72,4 +72,18 @@ export function useSymmetryLineTool({
     snap,
     clearSnap,
   })
+
+  // Compute the mirrored preview in pixel-space so LiveLayer can render both
+  // lines simultaneously while the user drags. previewPoints[0,1] is the fixed
+  // start; previewPoints[2,3] is the live end.  Both sides reflect across axisX.
+  const mirrorPreviewPoints = useMemo(() => {
+    const pts = base.previewPoints
+    if (!pts) return null
+    const [sx = 0, sy = 0, ex = 0, ey = 0] = pts
+    const axisX = findAxisXForPoint({ x: sx, y: sy }, layouts, stageSize)
+    const axisXpx = axisX * stageSize.width
+    return [2 * axisXpx - sx, sy, 2 * axisXpx - ex, ey]
+  }, [base.previewPoints, layouts, stageSize])
+
+  return { ...base, mirrorPreviewPoints }
 }

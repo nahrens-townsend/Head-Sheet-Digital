@@ -9,10 +9,11 @@ interface LiveLayerProps {
   color: string
   strokePixelWidth: number
   previewPoints: number[] | null
+  mirrorPreviewPoints?: number[] | null
   isExporting?: boolean
 }
 
-const VECTOR_TOOLS: ToolType[] = ['line', 'arrow', 'dotted']
+const VECTOR_TOOLS: ToolType[] = ['line', 'arrow', 'dotted', 'symmetry-line']
 
 export function LiveLayer({
   liveLineRef,
@@ -20,6 +21,7 @@ export function LiveLayer({
   color,
   strokePixelWidth,
   previewPoints,
+  mirrorPreviewPoints,
   isExporting = false,
 }: LiveLayerProps) {
   if (isExporting) {
@@ -58,6 +60,34 @@ export function LiveLayer({
           lineJoin="round"
           strokeScaleEnabled={false}
         />
+      )}
+
+      {/* Symmetry-line preview — original and mirrored line drawn in real time */}
+      {previewPoints && tool === 'symmetry-line' && (
+        <>
+          <Line
+            points={previewPoints}
+            stroke={color}
+            strokeWidth={strokePixelWidth}
+            opacity={1}
+            tension={0}
+            lineCap="round"
+            lineJoin="round"
+            strokeScaleEnabled={false}
+          />
+          {mirrorPreviewPoints && (
+            <Line
+              points={mirrorPreviewPoints}
+              stroke={color}
+              strokeWidth={strokePixelWidth}
+              opacity={1}
+              tension={0}
+              lineCap="round"
+              lineJoin="round"
+              strokeScaleEnabled={false}
+            />
+          )}
+        </>
       )}
 
       {/* Dotted line preview */}

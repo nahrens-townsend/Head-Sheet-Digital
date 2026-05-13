@@ -533,6 +533,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             color={color}
             strokePixelWidth={strokePixelWidth}
             previewPoints={activePreviewPoints}
+            mirrorPreviewPoints={tool === 'symmetry-line' ? symmetryTool.mirrorPreviewPoints : null}
             isExporting={isExporting}
           />
           <SelectionLayer
