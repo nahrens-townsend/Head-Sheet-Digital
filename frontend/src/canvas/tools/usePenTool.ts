@@ -6,6 +6,7 @@ import {
   getStagePoint,
   normalizePoints,
   createStrokeId,
+  type Point,
   type StageSize,
   type StrokeSize,
 } from '../utils/canvasUtils'
@@ -17,6 +18,13 @@ interface UsePenToolOptions {
   color: string
   strokeSize: StrokeSize
   onObjectComplete: (object: PenStrokeObject) => void
+  /** When symmetry is enabled, pass this ref to render the mirrored live stroke. */
+  mirrorLiveLineRef?: React.RefObject<Konva.Line | null>
+  /**
+   * Returns the normalized axisX (0–1) for a given pixel-space point.
+   * Required when mirrorLiveLineRef is provided.
+   */
+  getAxisX?: (pointPx: Point) => number
 }
 
 export function usePenTool({
@@ -26,9 +34,13 @@ export function usePenTool({
   color,
   strokeSize,
   onObjectComplete,
+  mirrorLiveLineRef,
+  getAxisX,
 }: UsePenToolOptions) {
   const isDrawingRef = useRef(false)
   const currentPointsRef = useRef<number[]>([])
+  const mirrorPointsRef = useRef<number[]>([])
+  const axisXpxRef = useRef<number>(0)
 
   const onPointerDown = useCallback(
     () => {
@@ -41,8 +53,17 @@ export function usePenTool({
       currentPointsRef.current = [point.x, point.y]
       liveLineRef.current?.points(currentPointsRef.current)
       liveLineRef.current?.getLayer()?.batchDraw()
+
+      if (mirrorLiveLineRef && getAxisX) {
+        const axisX = getAxisX(point)
+        axisXpxRef.current = axisX * stageSize.width
+        const mx = 2 * axisXpxRef.current - point.x
+        mirrorPointsRef.current = [mx, point.y]
+        mirrorLiveLineRef.current?.points(mirrorPointsRef.current)
+        mirrorLiveLineRef.current?.getLayer()?.batchDraw()
+      }
     },
-    [liveLineRef, stageRef, stageSize],
+    [liveLineRef, mirrorLiveLineRef, getAxisX, stageRef, stageSize],
   )
 
   const onPointerMove = useCallback(
@@ -63,8 +84,15 @@ export function usePenTool({
       currentPointsRef.current.push(point.x, point.y)
       liveLineRef.current.points(currentPointsRef.current)
       liveLineRef.current.getLayer()?.batchDraw()
+
+      if (mirrorLiveLineRef?.current) {
+        const mx = 2 * axisXpxRef.current - point.x
+        mirrorPointsRef.current.push(mx, point.y)
+        mirrorLiveLineRef.current.points(mirrorPointsRef.current)
+        mirrorLiveLineRef.current.getLayer()?.batchDraw()
+      }
     },
-    [liveLineRef, stageRef, stageSize],
+    [liveLineRef, mirrorLiveLineRef, stageRef, stageSize],
   )
 
   const onPointerUp = useCallback(
@@ -72,8 +100,11 @@ export function usePenTool({
       if (!isDrawingRef.current || currentPointsRef.current.length < 2) {
         isDrawingRef.current = false
         currentPointsRef.current = []
+        mirrorPointsRef.current = []
         liveLineRef.current?.points([])
         liveLineRef.current?.getLayer()?.batchDraw()
+        mirrorLiveLineRef?.current?.points([])
+        mirrorLiveLineRef?.current?.getLayer()?.batchDraw()
         return
       }
 
@@ -95,10 +126,13 @@ export function usePenTool({
 
       isDrawingRef.current = false
       currentPointsRef.current = []
+      mirrorPointsRef.current = []
       liveLineRef.current?.points([])
       liveLineRef.current?.getLayer()?.batchDraw()
+      mirrorLiveLineRef?.current?.points([])
+      mirrorLiveLineRef?.current?.getLayer()?.batchDraw()
     },
-    [strokeSize, color, liveLineRef, onObjectComplete, stageSize],
+    [strokeSize, color, liveLineRef, mirrorLiveLineRef, onObjectComplete, stageSize],
   )
 
   return {

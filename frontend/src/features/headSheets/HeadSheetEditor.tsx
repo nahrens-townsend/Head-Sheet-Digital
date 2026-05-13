@@ -5,6 +5,7 @@ import { HeadSheetCanvas } from '../../canvas/HeadSheetCanvas'
 import { SelectionPanel } from '../../canvas/SelectionPanel'
 import { useAutoSave } from '../../canvas/useAutoSave'
 import { useCanvasHistory } from '../../canvas/useCanvasHistory'
+import { useMirroredObjects } from '../../canvas/useMirroredObjects'
 import { useCanvasStore } from '../../stores/canvasStore'
 import { parseCanvasData } from '../../types/canvasObject'
 import { duplicateObject } from '../../canvas/utils/objectUtils'
@@ -21,10 +22,17 @@ export function HeadSheetEditor() {
   const replaceImageInputRef = useRef<HTMLInputElement | null>(null)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const { data, isLoading, isError } = useGetHeadSheet(sheetId)
-  const { addObject, updateObject, deleteObjects, undo, redo, canUndo, canRedo, objects, setObjects } =
+  const { addObject, addObjects, updateObject, updateObjectsBatch, deleteObjects: rawDeleteObjects, undo, redo, canUndo, canRedo, objects, setObjects } =
     useCanvasHistory()
   const saveStatus = useCanvasStore((state) => state.saveStatus)
   const { selectedObjectIds, setSelectedObjectIds, setZoom, setPanOffset } = useCanvasStore()
+
+  const { wrappedUpdateObject, wrappedDeleteObjects } = useMirroredObjects({
+    objects,
+    updateObject,
+    updateObjectsBatch,
+    deleteObjects: rawDeleteObjects,
+  })
   const saveMutation = useSaveStrokes(sheetId)
   const saveThumbnailMutation = useSaveThumbnail(sheetId)
   const saveImageMutation = useSaveImage()
@@ -118,7 +126,7 @@ export function HeadSheetEditor() {
       // Delete / Backspace — delete selected objects
       if ((key === 'delete' || key === 'backspace') && selectedObjectIds.length > 0) {
         event.preventDefault()
-        deleteObjects([...selectedObjectIds])
+        wrappedDeleteObjects([...selectedObjectIds])
         setSelectedObjectIds([])
         return
       }
@@ -142,7 +150,7 @@ export function HeadSheetEditor() {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [redo, undo, selectedObjectIds, objects, deleteObjects, addObject, setSelectedObjectIds, setZoom, setPanOffset])
+  }, [redo, undo, selectedObjectIds, objects, wrappedDeleteObjects, addObject, setSelectedObjectIds, setZoom, setPanOffset])
 
   async function handleExport() {
     try {
@@ -254,13 +262,14 @@ export function HeadSheetEditor() {
           canvasMode={sheet.canvasMode}
           imageDataUrl={sheet.imageDataUrl}
           onObjectComplete={addObject}
-          onUpdateObject={updateObject}
-          onDeleteObjects={deleteObjects}
+          onObjectsComplete={addObjects}
+          onUpdateObject={wrappedUpdateObject}
+          onDeleteObjects={wrappedDeleteObjects}
         />
         <SelectionPanel
           objects={objects}
-          onUpdateObject={updateObject}
-          onDeleteObjects={deleteObjects}
+          onUpdateObject={wrappedUpdateObject}
+          onDeleteObjects={wrappedDeleteObjects}
           onDuplicateObject={addObject}
         />
       </div>

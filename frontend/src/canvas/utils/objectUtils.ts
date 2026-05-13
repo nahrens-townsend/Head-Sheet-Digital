@@ -10,16 +10,28 @@ export function duplicateObject(obj: CanvasObject): CanvasObject {
   switch (obj.type) {
     case 'line':
     case 'arrow':
-    case 'dotted':
+    case 'dotted': {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { mirrorId: _mirrorId, ...rest } = obj
       return {
-        ...obj,
+        ...rest,
         id,
         createdAt,
         start: { x: obj.start.x + DUPLICATE_OFFSET, y: obj.start.y + DUPLICATE_OFFSET },
         mid: { x: obj.mid.x + DUPLICATE_OFFSET, y: obj.mid.y + DUPLICATE_OFFSET },
         end: { x: obj.end.x + DUPLICATE_OFFSET, y: obj.end.y + DUPLICATE_OFFSET },
       }
-    case 'pen':
+    }
+    case 'pen': {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { mirrorId: _mirrorId, ...rest } = obj
+      return {
+        ...rest,
+        id,
+        createdAt,
+        points: obj.points.map((v) => v + DUPLICATE_OFFSET),
+      }
+    }
     case 'eraser':
       return {
         ...obj,

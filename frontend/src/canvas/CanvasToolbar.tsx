@@ -39,7 +39,7 @@ export function CanvasToolbar({
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
-  const { tool, color, strokeSize, setTool, setColor, setStrokeSize, showGuides, setShowGuides } = useCanvasStore()
+  const { tool, color, strokeSize, setTool, setColor, setStrokeSize, showGuides, setShowGuides, symmetryEnabled, setSymmetryEnabled } = useCanvasStore()
 
   return (
     <div className="canvas-toolbar">
@@ -69,6 +69,16 @@ export function CanvasToolbar({
           title="Pen"
         >
           ✎
+        </button>
+        <button
+          type="button"
+          className={`toolbar-btn ${symmetryEnabled ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setSymmetryEnabled(!symmetryEnabled)}
+          aria-label="Toggle symmetry"
+          aria-pressed={symmetryEnabled}
+          title="Symmetry (mirrors pen, line, arrow, dotted)"
+        >
+          ⇔
         </button>
         <button
           type="button"

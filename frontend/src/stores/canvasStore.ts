@@ -13,6 +13,7 @@ interface CanvasState {
   zoom: number
   panOffset: Point
   showGuides: boolean
+  symmetryEnabled: boolean
   setTool: (tool: ToolType) => void
   setColor: (color: string) => void
   setStrokeSize: (strokeSize: StrokeSize) => void
@@ -21,6 +22,7 @@ interface CanvasState {
   setZoom: (zoom: number) => void
   setPanOffset: (offset: Point) => void
   setShowGuides: (show: boolean) => void
+  setSymmetryEnabled: (enabled: boolean) => void
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
@@ -32,6 +34,7 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   zoom: 1.0,
   panOffset: { x: 0, y: 0 },
   showGuides: true,
+  symmetryEnabled: false,
   setTool: (tool) => set({ tool }),
   setColor: (color) => set({ color: PALETTE.includes(color) ? color : PALETTE[0] }),
   setStrokeSize: (strokeSize) => set({ strokeSize }),
@@ -40,4 +43,5 @@ export const useCanvasStore = create<CanvasState>((set) => ({
   setZoom: (zoom) => set({ zoom }),
   setPanOffset: (panOffset) => set({ panOffset }),
   setShowGuides: (showGuides) => set({ showGuides }),
+  setSymmetryEnabled: (symmetryEnabled) => set({ symmetryEnabled }),
 }))
