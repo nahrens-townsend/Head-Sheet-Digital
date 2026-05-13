@@ -13,6 +13,8 @@ export interface PenStrokeObject extends BaseCanvasObject {
   type: 'pen'
   points: number[]
   tension: number
+  /** Id of the mirrored twin, present only when created with symmetry enabled. */
+  mirrorId?: string
 }
 
 export interface EraserStrokeObject extends BaseCanvasObject {

@@ -22,7 +22,16 @@ export function duplicateObject(obj: CanvasObject): CanvasObject {
         end: { x: obj.end.x + DUPLICATE_OFFSET, y: obj.end.y + DUPLICATE_OFFSET },
       }
     }
-    case 'pen':
+    case 'pen': {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { mirrorId: _mirrorId, ...rest } = obj
+      return {
+        ...rest,
+        id,
+        createdAt,
+        points: obj.points.map((v) => v + DUPLICATE_OFFSET),
+      }
+    }
     case 'eraser':
       return {
         ...obj,

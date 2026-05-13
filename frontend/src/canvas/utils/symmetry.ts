@@ -18,6 +18,15 @@ export function mirrorLineAcrossAxis(line: LineObject, axisX: number): LineObjec
 }
 
 /**
+ * Mirrors a flat normalized-point array (pairs of [x, y, x, y, ...]) across a
+ * vertical axis.  Used to create the mirror twin of a pen stroke.
+ * Formula: x' = 2*axisX - x.
+ */
+export function mirrorNormalizedPointsAcrossAxis(points: number[], axisX: number): number[] {
+  return points.map((v, i) => (i % 2 === 0 ? 2 * axisX - v : v))
+}
+
+/**
  * Returns the normalized axis X (vertical center) of the template layout whose
  * rect contains the given pixel-space point.  When the point falls in a gap
  * between templates (padding/outer-pad areas) the nearest rect center is used

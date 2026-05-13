@@ -30,6 +30,26 @@ export function useMirroredObjects({
     (id: string, updater: (obj: CanvasObject) => CanvasObject) => {
       const obj = objects.find((o) => o.id === id)
 
+      // --- Pen stroke symmetric pairs: propagate style-only changes to twin ---
+      if (obj && obj.type === 'pen' && obj.mirrorId) {
+        const updated = updater(obj)
+        const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
+        if (updated.type === 'pen' && mirrorObj && mirrorObj.type === 'pen') {
+          const mirrorId = obj.mirrorId
+          const mirrorUpdater = (m: CanvasObject): CanvasObject => {
+            if (m.type !== 'pen') return m
+            return { ...m, color: updated.color, width: updated.width, opacity: updated.opacity }
+          }
+          updateObjectsBatch([
+            { id, updater },
+            { id: mirrorId, updater: mirrorUpdater },
+          ])
+          return
+        }
+        updateObject(id, updater)
+        return
+      }
+
       if (!obj || !isLineObject(obj) || !obj.mirrorId) {
         updateObject(id, updater)
         return
@@ -74,9 +94,8 @@ export function useMirroredObjects({
       const expanded = new Set<string>(ids)
       for (const id of ids) {
         const obj = objects.find((o) => o.id === id)
-        if (obj && isLineObject(obj) && obj.mirrorId) {
-          expanded.add(obj.mirrorId)
-        }
+        const mirrorId = obj && 'mirrorId' in obj ? (obj as { mirrorId?: string }).mirrorId : undefined
+        if (mirrorId) expanded.add(mirrorId)
       }
       deleteObjects([...expanded])
     },

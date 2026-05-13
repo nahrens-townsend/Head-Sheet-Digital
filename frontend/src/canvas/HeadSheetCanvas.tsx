@@ -13,18 +13,17 @@ import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
 import type { CanvasMode, TemplateType } from '../types/headSheet';
 import type { CanvasObject } from '../types/canvasObject';
-import { isNoteObject } from '../types/canvasObject';
+import { isNoteObject, isLineObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
 import { useArrowLineTool } from './tools/useArrowLineTool';
 import { useDottedLineTool } from './tools/useDottedLineTool';
 import { useNoteTool } from './tools/useNoteTool';
-import { useSymmetryLineTool } from './tools/useSymmetryLineTool';
 import { usePenTool } from './tools/usePenTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
-import { STROKE_SIZES, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
+import { STROKE_SIZES, createStrokeId, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ImageCanvasLayer } from './layers/ImageCanvasLayer';
 import { GuideLayer } from './layers/GuideLayer';
@@ -34,6 +33,7 @@ import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
 import { computeTemplateLayouts } from './utils/layoutEngine';
+import { mirrorLineAcrossAxis, mirrorNormalizedPointsAcrossAxis, findAxisXForPoint } from './utils/symmetry';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
@@ -118,6 +118,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const containerRef = useRef<HTMLDivElement | null>(null);
     const stageRef = useRef<Konva.Stage | null>(null);
     const liveLineRef = useRef<Konva.Line | null>(null);
+    const mirrorLiveLineRef = useRef<Konva.Line | null>(null);
     const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
     const [isExporting, setIsExporting] = useState(false);
     const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
@@ -132,6 +133,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       setZoom,
       setPanOffset,
       showGuides,
+      symmetryEnabled,
     } = useCanvasStore();
 
     // Mutable refs so native event handlers always see the latest values without
@@ -410,12 +412,65 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       [exportStage],
     );
 
+    /** Stable callback: normalized axis X for a pixel-space point. */
+    const getAxisX = useCallback(
+      (pointPx: { x: number; y: number }) => findAxisXForPoint(pointPx, layouts, stageSize),
+      [layouts, stageSize],
+    );
+
+    /**
+     * Intercepts object completion for pen/line/arrow/dotted tools.
+     * When symmetry is enabled it creates a mirrored twin and emits both as
+     * a single batched undo entry via onObjectsComplete.
+     */
+    const effectiveOnObjectComplete = useCallback(
+      (obj: CanvasObject) => {
+        if (!symmetryEnabled || (obj.type !== 'pen' && !isLineObject(obj))) {
+          onObjectComplete(obj);
+          return;
+        }
+
+        const startPx = isLineObject(obj)
+          ? { x: obj.start.x * stageSize.width, y: obj.start.y * stageSize.height }
+          : { x: (obj.points[0] ?? 0) * stageSize.width, y: (obj.points[1] ?? 0) * stageSize.height };
+
+        const axisX = findAxisXForPoint(startPx, layouts, stageSize);
+        const mirrorId = createStrokeId();
+
+        let original: CanvasObject;
+        let mirrored: CanvasObject;
+
+        if (isLineObject(obj)) {
+          original = { ...obj, mirrorId };
+          mirrored = {
+            ...mirrorLineAcrossAxis(obj, axisX),
+            id: mirrorId,
+            mirrorId: obj.id,
+            createdAt: new Date().toISOString(),
+          };
+        } else {
+          // pen stroke
+          original = { ...obj, mirrorId };
+          mirrored = {
+            ...obj,
+            id: mirrorId,
+            mirrorId: obj.id,
+            points: mirrorNormalizedPointsAcrossAxis(obj.points, axisX),
+            createdAt: new Date().toISOString(),
+          };
+        }
+
+        onObjectsComplete([original, mirrored]);
+      },
+      [symmetryEnabled, onObjectComplete, onObjectsComplete, layouts, stageSize],
+    );
+
     const commonVectorOpts = {
       stageRef,
       stageSize,
       color,
       strokeSize,
-      onObjectComplete,
+      onObjectComplete: effectiveOnObjectComplete,
       snap,
       clearSnap,
     };
@@ -426,13 +481,9 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       stageSize,
       color,
       strokeSize,
-      onObjectComplete,
-    });
-
-    const symmetryTool = useSymmetryLineTool({
-      ...commonVectorOpts,
-      layouts,
-      onObjectsComplete,
+      onObjectComplete: effectiveOnObjectComplete,
+      mirrorLiveLineRef: symmetryEnabled ? mirrorLiveLineRef : undefined,
+      getAxisX: symmetryEnabled ? getAxisX : undefined,
     });
 
     const lineTool = useLineTool(commonVectorOpts);
@@ -466,8 +517,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return noteTool;
         case 'line':
           return lineTool;
-        case 'symmetry-line':
-          return symmetryTool;
         case 'arrow':
           return arrowTool;
         case 'dotted':
@@ -480,16 +529,25 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         default:
           return penTool;
       }
-    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, penTool, selectTool, symmetryTool, tool]);
+    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, penTool, selectTool, tool]);
 
     const activePreviewPoints =
-      tool === 'line' || tool === 'symmetry-line'
-        ? (tool === 'line' ? lineTool : symmetryTool).previewPoints
+      tool === 'line'
+        ? lineTool.previewPoints
         : tool === 'arrow'
           ? arrowTool.previewPoints
           : tool === 'dotted'
             ? dottedTool.previewPoints
             : null;
+
+    // When symmetry is on, compute the mirror of any active vector-tool preview.
+    const mirrorPreviewPoints = useMemo(() => {
+      if (!symmetryEnabled || !activePreviewPoints) return null;
+      const [sx = 0, sy = 0, ex = 0, ey = 0] = activePreviewPoints;
+      const axisX = findAxisXForPoint({ x: sx, y: sy }, layouts, stageSize);
+      const axisXpx = axisX * stageSize.width;
+      return [2 * axisXpx - sx, sy, 2 * axisXpx - ex, ey];
+    }, [symmetryEnabled, activePreviewPoints, layouts, stageSize]);
 
     return (
       <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool}`}>
@@ -529,11 +587,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           />
           <LiveLayer
             liveLineRef={liveLineRef}
+            mirrorLiveLineRef={mirrorLiveLineRef}
             tool={tool}
             color={color}
             strokePixelWidth={strokePixelWidth}
             previewPoints={activePreviewPoints}
-            mirrorPreviewPoints={tool === 'symmetry-line' ? symmetryTool.mirrorPreviewPoints : null}
+            mirrorPreviewPoints={mirrorPreviewPoints}
             isExporting={isExporting}
           />
           <SelectionLayer
