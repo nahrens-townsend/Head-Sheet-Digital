@@ -30,7 +30,9 @@ export function useSelectTool({ stageRef, stageSize, objects }: UseSelectToolOpt
         if (
           hitTestCanvasObject(obj, px, stageSize, selectThreshold(obj))
         ) {
-          setSelectedObjectIds([obj.id])
+          const mirrorId = 'mirrorId' in obj ? (obj as { mirrorId?: string }).mirrorId : undefined
+          const ids = mirrorId ? [obj.id, mirrorId] : [obj.id]
+          setSelectedObjectIds(ids)
           return
         }
       }
