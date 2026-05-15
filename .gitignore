@@ -6,6 +6,7 @@ obj/
 .vs/
 *.swp
 *.sln.docstates
+*.lscache
 TestResults/
 *.nupkg
 project.lock.json
