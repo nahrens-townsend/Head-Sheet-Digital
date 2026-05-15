@@ -22,11 +22,8 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
   const createSheet = useCreateHeadSheet()
   const templates = useTemplates()
   const nameRef = useRef<HTMLInputElement>(null)
-  const mountedRef = useRef(true)
-
   useEffect(() => {
     nameRef.current?.focus()
-    return () => { mountedRef.current = false }
   }, [])
 
   function toggleType(type: TemplateType) {
@@ -225,13 +222,11 @@ export function CreateSheetModal({ onClose, onCreated }: Props) {
                     setIsReading(true)
                     const reader = new FileReader()
                     reader.onload = (ev) => {
-                      if (!mountedRef.current) return
                       setImageDataUrl(ev.target?.result as string)
                       setImageFileName(file.name)
                       setIsReading(false)
                     }
                     reader.onerror = () => {
-                      if (!mountedRef.current) return
                       setIsReading(false)
                     }
                     reader.readAsDataURL(file)
