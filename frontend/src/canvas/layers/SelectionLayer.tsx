@@ -237,6 +237,16 @@ export function SelectionLayer({
     .map((id) => objects.find((o) => o.id === id))
     .filter(Boolean) as CanvasObject[]
 
+  // For mirror pairs: the object whose id appears later in selectedObjectIds is "passive"
+  // (linked highlight only, no drag handles). The earlier-indexed twin is "primary" and
+  // keeps full interactivity. Non-paired objects are always primary.
+  const selectedIdSet = new Set(selectedObjectIds)
+  function isPassiveSelection(obj: CanvasObject): boolean {
+    const mId = 'mirrorId' in obj ? (obj as { mirrorId?: string }).mirrorId : undefined
+    if (!mId || !selectedIdSet.has(mId)) return false
+    return selectedObjectIds.indexOf(obj.id) > selectedObjectIds.indexOf(mId)
+  }
+
   return (
     <Layer>
       {selectedObjects.map((obj) => {
@@ -247,6 +257,26 @@ export function SelectionLayer({
             ? draftState
             : null
           const pts = draftPen ? draftPen.points : committedPts
+
+          // Mirror twin: passive highlight (dashed halo, no drag handles)
+          if (isPassiveSelection(obj)) {
+            return (
+              <Group key={obj.id}>
+                <Line
+                  points={pts}
+                  stroke={SELECTION_HIGHLIGHT}
+                  strokeWidth={STROKE_SIZES[obj.width] + 6}
+                  opacity={0.15}
+                  tension={obj.tension}
+                  lineCap="round"
+                  lineJoin="round"
+                  strokeScaleEnabled={false}
+                  listening={false}
+                  dash={[8, 6]}
+                />
+              </Group>
+            )
+          }
 
           return (
             <Group key={obj.id}>
@@ -340,6 +370,28 @@ export function SelectionLayer({
           const dStart = draftLine ? draftLine.start : cStart
           const dMid   = draftLine ? draftLine.mid   : cMid
           const dEnd   = draftLine ? draftLine.end   : cEnd
+
+          // Mirror twin: passive highlight (dashed halo, no drag handles)
+          if (isPassiveSelection(obj)) {
+            return (
+              <Group key={obj.id}>
+                <Shape
+                  stroke={SELECTION_HIGHLIGHT}
+                  strokeWidth={STROKE_SIZES[obj.width] + 6}
+                  opacity={0.15}
+                  strokeScaleEnabled={false}
+                  listening={false}
+                  dash={[8, 6]}
+                  sceneFunc={(ctx, shape) => {
+                    ctx.beginPath()
+                    ctx.moveTo(cStart.x, cStart.y)
+                    ctx.quadraticCurveTo(cMid.x, cMid.y, cEnd.x, cEnd.y)
+                    ctx.strokeShape(shape)
+                  }}
+                />
+              </Group>
+            )
+          }
 
           return (
             <Group key={obj.id}>
