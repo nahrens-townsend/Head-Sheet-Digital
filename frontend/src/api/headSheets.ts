@@ -42,7 +42,7 @@ export const headSheetsApi = {
 
   saveImage: (id: string, imageDataUrl: string) =>
     apiClient
-      .put<ApiResponse<HeadSheet>>(`/head-sheets/${id}/image`, { imageDataUrl })
+      .put<ApiResponse<HeadSheet>>(`/head-sheets/${id}/image`, { imageDataUrl }, { timeout: 30_000 })
       .then((r) => r.data),
 
   delete: (id: string) => apiClient.delete(`/head-sheets/${id}`),

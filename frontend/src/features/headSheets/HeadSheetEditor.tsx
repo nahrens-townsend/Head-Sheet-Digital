@@ -38,6 +38,8 @@ export function HeadSheetEditor() {
   const saveImageMutation = useSaveImage()
   const createTemplateMutation = useCreateTemplate()
 
+  useEffect(() => () => { saveImageMutation.reset() }, [])
+
   useEffect(() => {
     initializedSheetIdRef.current = null
   }, [sheetId])
@@ -230,6 +232,11 @@ export function HeadSheetEditor() {
         canRedo={canRedo}
         canSaveTemplate={objects.length > 0}
         canvasMode={sheet.canvasMode}
+        imageUploadStatus={
+          saveImageMutation.isPending ? 'uploading' :
+          saveImageMutation.isError ? 'error' :
+          'idle'
+        }
         onUndo={undo}
         onRedo={redo}
         onExport={handleExport}
@@ -250,8 +257,11 @@ export function HeadSheetEditor() {
         onChange={async (e) => {
           const file = e.target.files?.[0]
           if (!file) return
-          await handleReplaceImageFile(file)
-          e.currentTarget.value = ''
+          try {
+            await handleReplaceImageFile(file)
+          } finally {
+            e.currentTarget.value = ''
+          }
         }}
       />
       <div className="editor__canvas-wrap">

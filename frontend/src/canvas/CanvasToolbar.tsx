@@ -8,6 +8,7 @@ interface CanvasToolbarProps {
   canRedo: boolean
   canSaveTemplate: boolean
   canvasMode: CanvasMode
+  imageUploadStatus: 'idle' | 'uploading' | 'error'
   onUndo: () => void
   onRedo: () => void
   onExport: () => void
@@ -30,6 +31,7 @@ export function CanvasToolbar({
   canRedo,
   canSaveTemplate,
   canvasMode,
+  imageUploadStatus,
   onUndo,
   onRedo,
   onExport,
@@ -153,10 +155,15 @@ export function CanvasToolbar({
         {canvasMode === 'image' && (
           <button
             type="button"
-            className="toolbar-btn"
+            className={`toolbar-btn${imageUploadStatus === 'error' ? ' toolbar-btn--error' : ''}`}
             onClick={onReplaceImage}
+            disabled={imageUploadStatus === 'uploading'}
             aria-label="Replace image"
-            title="Replace image"
+            title={
+              imageUploadStatus === 'uploading' ? 'Uploading…' :
+              imageUploadStatus === 'error' ? 'Upload failed — click to retry' :
+              'Replace image'
+            }
           >
             🖼
           </button>
