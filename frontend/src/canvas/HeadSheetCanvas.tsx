@@ -294,7 +294,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
         if (isPanning) {
           isPanning = false;
-          el.style.cursor = toolRef.current === 'hand' ? 'grab' : '';
+          // Remove the inline 'grabbing' override; CSS class owns the idle cursor.
+          el.style.removeProperty('cursor');
           e.stopPropagation();
           return;
         }
@@ -333,6 +334,15 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (isExporting || tool !== 'select') setEditingObjectId(null);
     }, [isExporting, tool]);
+
+    // Clear any lingering inline cursor when the tool changes.
+    // Inline styles have higher specificity than the CSS class, so without this the
+    // 'grabbing' cursor (set on pointerdown) would persist after switching tools.
+    useEffect(() => {
+      if (tool !== 'hand') {
+        containerRef.current?.style.removeProperty('cursor');
+      }
+    }, [tool]);
 
     // Load template SVG images for templates mode.
     const templateImages = useTemplateImages(canvasMode === 'templates' ? templateTypes : []);
