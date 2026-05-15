@@ -121,7 +121,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const mirrorLiveLineRef = useRef<Konva.Line | null>(null);
     const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
     const [isExporting, setIsExporting] = useState(false);
-    const [editingObjectId, setEditingObjectId] = useState<string | null>(null);
+    const [editingObjectIds, setEditingObjectIds] = useState<Set<string>>(new Set());
     const exportQueueRef = useRef(Promise.resolve() as Promise<void>);
     const {
       tool,
@@ -332,7 +332,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     // Prevents the object from staying hidden if the drag is interrupted before onDragEnd fires.
     useEffect(() => {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (isExporting || tool !== 'select') setEditingObjectId(null);
+      if (isExporting || tool !== 'select') setEditingObjectIds(new Set());
     }, [isExporting, tool]);
 
     // Clear any lingering inline cursor when the tool changes.
@@ -593,7 +593,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             stageSize={stageSize}
             zoom={zoom}
             panOffset={panOffset}
-            hiddenObjectIds={editingObjectId ? new Set([editingObjectId]) : undefined}
+            hiddenObjectIds={editingObjectIds.size > 0 ? editingObjectIds : undefined}
           />
           <LiveLayer
             liveLineRef={liveLineRef}
@@ -615,8 +615,12 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             snap={snap}
             clearSnap={clearSnap}
             isExporting={isExporting}
-            onDraftStart={setEditingObjectId}
-            onDraftEnd={() => setEditingObjectId(null)}
+            onDraftStart={(id, mirrorId) => {
+              const ids = new Set([id])
+              if (mirrorId) ids.add(mirrorId)
+              setEditingObjectIds(ids)
+            }}
+            onDraftEnd={() => setEditingObjectIds(new Set())}
           />
           {isExporting && (
             <NotesExportLayer notes={objects.filter(isNoteObject)} stageSize={stageSize} />

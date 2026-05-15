@@ -27,6 +27,7 @@ interface LineDraft {
   start: Point // px (content-space)
   mid: Point
   end: Point
+  mirrorDraft?: { id: string; start: Point; mid: Point; end: Point }
 }
 
 interface PenDraft {
@@ -126,6 +127,11 @@ function ctrlFromOnCurve(q: Point, start: Point, end: Point): Point {
   }
 }
 
+/** Reflect a pixel-space point across a vertical axis at axisXpx. */
+function mirrorPointPx(p: Point, axisXpx: number): Point {
+  return { x: 2 * axisXpx - p.x, y: p.y }
+}
+
 // ── ControlHandle ─────────────────────────────────────────────────────────────
 
 function ControlHandle({
@@ -176,7 +182,7 @@ interface SelectionLayerProps {
   snap?: SnapFn
   clearSnap?: () => void
   isExporting?: boolean
-  onDraftStart?: (id: string) => void
+  onDraftStart?: (id: string, mirrorId?: string) => void
   onDraftEnd?: () => void
 }
 
@@ -355,7 +361,7 @@ export function SelectionLayer({
                 onDragStart={(e) => {
                   const ptr = e.target.getStage()?.getRelativePointerPosition()
                   if (!ptr) return
-                  onDraftStart?.(obj.id)
+                  onDraftStart?.(obj.id, obj.mirrorId)
                   bodyDragRef.current = {
                     kind: 'line',
                     id: obj.id,
@@ -382,13 +388,23 @@ export function SelectionLayer({
                   if (!bsStart?.snapped) {
                     snap?.({ x: ref.snapEnd.x + dx, y: ref.snapEnd.y + dy }, obj.id)
                   }
-                  setDraftState({
-                    kind: 'line',
-                    id: obj.id,
-                    start: { x: ref.snapStart.x + dx, y: ref.snapStart.y + dy },
-                    mid:   { x: ref.snapMid.x   + dx, y: ref.snapMid.y   + dy },
-                    end:   { x: ref.snapEnd.x   + dx, y: ref.snapEnd.y   + dy },
-                  })
+                  const newStart = { x: ref.snapStart.x + dx, y: ref.snapStart.y + dy }
+                  const newMid   = { x: ref.snapMid.x   + dx, y: ref.snapMid.y   + dy }
+                  const newEnd   = { x: ref.snapEnd.x   + dx, y: ref.snapEnd.y   + dy }
+                  let mirrorDraft: LineDraft['mirrorDraft'] = undefined
+                  if (obj.mirrorId) {
+                    const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
+                    if (mirrorObj && isLineObject(mirrorObj)) {
+                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      mirrorDraft = {
+                        id: mirrorObj.id,
+                        start: mirrorPointPx(newStart, axisXpx),
+                        mid:   mirrorPointPx(newMid,   axisXpx),
+                        end:   mirrorPointPx(newEnd,   axisXpx),
+                      }
+                    }
+                  }
+                  setDraftState({ kind: 'line', id: obj.id, start: newStart, mid: newMid, end: newEnd, mirrorDraft })
                 }}
                 onDragEnd={(e) => {
                   const ref = bodyDragRef.current
@@ -460,18 +476,51 @@ export function SelectionLayer({
                 />
               )}
 
+              {/* Live mirror bezier overlay — shown during symmetric drag so the twin tracks in real time */}
+              {draftLine?.mirrorDraft && (
+                <Shape
+                  stroke={obj.color}
+                  strokeWidth={STROKE_SIZES[obj.width]}
+                  opacity={obj.opacity}
+                  lineCap="round"
+                  lineJoin="round"
+                  strokeScaleEnabled={false}
+                  listening={false}
+                  sceneFunc={(ctx, shape) => {
+                    const md = draftLine.mirrorDraft!
+                    ctx.beginPath()
+                    ctx.moveTo(md.start.x, md.start.y)
+                    ctx.quadraticCurveTo(md.mid.x, md.mid.y, md.end.x, md.end.y)
+                    ctx.strokeShape(shape)
+                  }}
+                />
+              )}
+
               {/* Control handles — rendered last so they sit above the body drag shape */}
               <ControlHandle
                 x={cStart.x}
                 y={cStart.y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragStart={() => onDraftStart?.(obj.id)}
+                onDragStart={() => onDraftStart?.(obj.id, obj.mirrorId)}
                 onDragMove={(p) => {
                   const sr = snap?.(p, obj.id)
                   const sp = sr?.point ?? p
                   const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: sp, mid: newMid, end: cEnd })
+                  let mirrorDraft: LineDraft['mirrorDraft'] = undefined
+                  if (obj.mirrorId) {
+                    const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
+                    if (mirrorObj && isLineObject(mirrorObj)) {
+                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      mirrorDraft = {
+                        id: mirrorObj.id,
+                        start: mirrorPointPx(sp,     axisXpx),
+                        mid:   mirrorPointPx(newMid, axisXpx),
+                        end:   mirrorPointPx(cEnd,   axisXpx),
+                      }
+                    }
+                  }
+                  setDraftState({ kind: 'line', id: obj.id, start: sp, mid: newMid, end: cEnd, mirrorDraft })
                 }}
                 onDragEnd={(p) => {
                   const sr = snap?.(p, obj.id)
@@ -493,10 +542,23 @@ export function SelectionLayer({
                 y={onCurveAtHalf(dStart, dMid, dEnd).y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragStart={() => onDraftStart?.(obj.id)}
+                onDragStart={() => onDraftStart?.(obj.id, obj.mirrorId)}
                 onDragMove={(p) => {
                   const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: ctrl, end: cEnd })
+                  let mirrorDraft: LineDraft['mirrorDraft'] = undefined
+                  if (obj.mirrorId) {
+                    const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
+                    if (mirrorObj && isLineObject(mirrorObj)) {
+                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      mirrorDraft = {
+                        id: mirrorObj.id,
+                        start: mirrorPointPx(cStart, axisXpx),
+                        mid:   mirrorPointPx(ctrl,   axisXpx),
+                        end:   mirrorPointPx(cEnd,   axisXpx),
+                      }
+                    }
+                  }
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: ctrl, end: cEnd, mirrorDraft })
                 }}
                 onDragEnd={(p) => {
                   const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
@@ -521,12 +583,25 @@ export function SelectionLayer({
                 y={cEnd.y}
                 radius={handleRadius}
                 zoom={zoom}
-                onDragStart={() => onDraftStart?.(obj.id)}
+                onDragStart={() => onDraftStart?.(obj.id, obj.mirrorId)}
                 onDragMove={(p) => {
                   const sr = snap?.(p, obj.id)
                   const ep = sr?.point ?? p
                   const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
-                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: ep })
+                  let mirrorDraft: LineDraft['mirrorDraft'] = undefined
+                  if (obj.mirrorId) {
+                    const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
+                    if (mirrorObj && isLineObject(mirrorObj)) {
+                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      mirrorDraft = {
+                        id: mirrorObj.id,
+                        start: mirrorPointPx(cStart, axisXpx),
+                        mid:   mirrorPointPx(newMid, axisXpx),
+                        end:   mirrorPointPx(ep,     axisXpx),
+                      }
+                    }
+                  }
+                  setDraftState({ kind: 'line', id: obj.id, start: cStart, mid: newMid, end: ep, mirrorDraft })
                 }}
                 onDragEnd={(p) => {
                   const sr = snap?.(p, obj.id)
