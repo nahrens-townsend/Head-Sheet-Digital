@@ -1,4 +1,4 @@
-import type { StrokeSize } from '../canvas/utils/canvasUtils'
+import { WORLD_SIZE, type StrokeSize } from '../canvas/utils/canvasUtils'
 import type { Stroke } from './stroke'
 
 export interface BaseCanvasObject {
@@ -70,7 +70,7 @@ export function isTextObject(obj: CanvasObject): obj is TextObject {
 }
 
 export interface CanvasData {
-  version: 4
+  version: 5
   objects: CanvasObject[]
 }
 
@@ -130,19 +130,50 @@ function migrateStroke(stroke: Stroke): CanvasObject {
 }
 
 /** Migrate v3 objects to v4: convert legacy NoteObjects → TextObjects. */
-function migrateV3ToV4(objects: CanvasObject[]): CanvasData {
-  return {
-    version: 4,
-    objects: objects.map((obj): CanvasObject => {
-      if (obj.type !== 'note') return obj
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { noteColor: _noteColor, type: _type, ...rest } = obj
-      return { ...rest, type: 'text' } satisfies TextObject
-    }),
-  }
+function migrateV3ToV4(objects: CanvasObject[]): CanvasObject[] {
+  return objects.map((obj): CanvasObject => {
+    if (obj.type !== 'note') return obj
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { noteColor: _noteColor, type: _type, ...rest } = obj
+    return { ...rest, type: 'text' } satisfies TextObject
+  })
 }
 
-/** Parse server JSON (v1 Stroke[] or v2/v3/v4 CanvasData) into a v4 CanvasData object. */
+/**
+ * Migrate v4 objects to v5: convert normalized [0,1] coordinates → world pixels.
+ * Old: coords relative to unknown container size; New: world pixels [0..WORLD_SIZE].
+ * Migration assumes objects were created on a WORLD_SIZE reference viewport.
+ */
+function migrateV4ToV5(objects: CanvasObject[]): CanvasObject[] {
+  return objects.map((obj): CanvasObject => {
+    if (obj.type === 'pen' || obj.type === 'eraser') {
+      return {
+        ...obj,
+        points: obj.points.map((v, i) =>
+          i % 2 === 0 ? v * WORLD_SIZE.width : v * WORLD_SIZE.height,
+        ),
+      }
+    }
+    if (obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted') {
+      return {
+        ...obj,
+        start: { x: obj.start.x * WORLD_SIZE.width, y: obj.start.y * WORLD_SIZE.height },
+        mid:   { x: obj.mid.x   * WORLD_SIZE.width, y: obj.mid.y   * WORLD_SIZE.height },
+        end:   { x: obj.end.x   * WORLD_SIZE.width, y: obj.end.y   * WORLD_SIZE.height },
+      }
+    }
+    if (obj.type === 'note' || obj.type === 'text') {
+      return {
+        ...obj,
+        x: obj.x * WORLD_SIZE.width,
+        y: obj.y * WORLD_SIZE.height,
+      }
+    }
+    return obj
+  })
+}
+
+/** Parse server JSON (v1 Stroke[] or v2/v3/v4/v5 CanvasData) into a v5 CanvasData object. */
 export function parseCanvasData(json: string): CanvasData {
   try {
     const parsed = JSON.parse(json) as unknown
@@ -153,26 +184,31 @@ export function parseCanvasData(json: string): CanvasData {
       (parsed as { version?: unknown }).version === n &&
       Array.isArray((parsed as { objects?: unknown }).objects)
 
-    // v4: current version
-    if (isVersioned(parsed, 4)) return parsed as CanvasData
+    // v5: current version (world-pixel coordinates)
+    if (isVersioned(parsed, 5)) return parsed as CanvasData
 
-    // v3: migrate NoteObject → TextObject
-    if (isVersioned(parsed, 3)) {
-      return migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)
+    // v4: had TextObject + normalized [0,1] coords → upgrade to world pixels
+    if (isVersioned(parsed, 4)) {
+      return { version: 5, objects: migrateV4ToV5((parsed as { objects: CanvasObject[] }).objects) }
     }
 
-    // v2: was a no-op upgrade to v3; run migration to v4
+    // v3: NoteObject → TextObject, then → world pixels
+    if (isVersioned(parsed, 3)) {
+      return { version: 5, objects: migrateV4ToV5(migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)) }
+    }
+
+    // v2: was a no-op upgrade to v3; run same pipeline
     if (isVersioned(parsed, 2)) {
-      return migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)
+      return { version: 5, objects: migrateV4ToV5(migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)) }
     }
 
     // v1: flat Stroke array
     if (Array.isArray(parsed)) {
-      return migrateV3ToV4((parsed as Stroke[]).map(migrateStroke))
+      return { version: 5, objects: migrateV4ToV5(migrateV3ToV4((parsed as Stroke[]).map(migrateStroke))) }
     }
   } catch {
     // fall through
   }
 
-  return { version: 4, objects: [] }
+  return { version: 5, objects: [] }
 }

@@ -1,5 +1,5 @@
 import type { CanvasObject } from '../../types/canvasObject'
-import { denormalizePoint, denormalizePoints, STROKE_SIZES, type Point, type StageSize } from './canvasUtils'
+import { STROKE_SIZES, type Point } from './canvasUtils'
 
 export function distToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
@@ -11,17 +11,16 @@ export function distToSegment(p: Point, a: Point, b: Point): number {
 }
 
 /**
- * Hit-test a single canvas object against a pixel-space pointer position.
- * thresholdPx controls how many pixels from the object counts as a hit.
+ * Hit-test a single canvas object against a world-space pointer position.
+ * Coordinates are in world pixels [0..WORLD_SIZE]; thresholdPx is in world pixels.
  */
 export function hitTestCanvasObject(
   obj: CanvasObject,
   px: Point,
-  stageSize: StageSize,
   thresholdPx: number,
 ): boolean {
   if (obj.type === 'pen' || obj.type === 'eraser') {
-    const pts = denormalizePoints(obj.points, stageSize)
+    const pts = obj.points
     for (let i = 0; i < pts.length - 2; i += 2) {
       if (
         distToSegment(
@@ -37,9 +36,9 @@ export function hitTestCanvasObject(
   }
 
   if (obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted') {
-    const s = denormalizePoint(obj.start, stageSize)
-    const m = denormalizePoint(obj.mid, stageSize)
-    const e = denormalizePoint(obj.end, stageSize)
+    const s = obj.start
+    const m = obj.mid
+    const e = obj.end
     for (let t = 0; t <= 1; t += 0.05) {
       const bx = (1 - t) * (1 - t) * s.x + 2 * t * (1 - t) * m.x + t * t * e.x
       const by = (1 - t) * (1 - t) * s.y + 2 * t * (1 - t) * m.y + t * t * e.y

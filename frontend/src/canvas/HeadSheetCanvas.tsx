@@ -22,7 +22,7 @@ import { useTextTool } from './tools/useTextTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
-import { STROKE_SIZES, createStrokeId, type StagePointerHandler, type StageSize } from './utils/canvasUtils';
+import { STROKE_SIZES, WORLD_SIZE, createStrokeId, type StagePointerHandler, type StageSize, type Point } from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ImageCanvasLayer } from './layers/ImageCanvasLayer';
 import { GuideLayer } from './layers/GuideLayer';
@@ -118,6 +118,27 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const stageRef = useRef<Konva.Stage | null>(null);
     const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
     const [isExporting, setIsExporting] = useState(false);
+
+    // Letterbox transform: fit the fixed WORLD_SIZE canvas inside the container.
+    const fitScale = useMemo(
+      () => Math.min(stageSize.width / WORLD_SIZE.width, stageSize.height / WORLD_SIZE.height),
+      [stageSize],
+    );
+    const fitOffset = useMemo<Point>(
+      () => ({
+        x: (stageSize.width  - WORLD_SIZE.width  * fitScale) / 2,
+        y: (stageSize.height - WORLD_SIZE.height * fitScale) / 2,
+      }),
+      [stageSize, fitScale],
+    );
+    // Mutable refs so native event handlers always see the latest values without
+    // needing to be re-registered on every render.
+    const fitScaleRef = useRef(fitScale);
+    // eslint-disable-next-line react-hooks/refs
+    fitScaleRef.current = fitScale;
+    const fitOffsetRef = useRef<Point>(fitOffset);
+    // eslint-disable-next-line react-hooks/refs
+    fitOffsetRef.current = fitOffset;
     const [editingObjectIds, setEditingObjectIds] = useState<Set<string>>(new Set());
     const exportQueueRef = useRef(Promise.resolve() as Promise<void>);
     const {
@@ -193,14 +214,17 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       const applyZoom = (rawZoom: number, pivotCanvas: { x: number; y: number }) => {
         const clamped = Math.min(Math.max(rawZoom, MIN_ZOOM), MAX_ZOOM);
         const oldZoom = zoomRef.current;
+        const fs = fitScaleRef.current;
+        const fo = fitOffsetRef.current;
+        // World-pixel coord under the pivot; preserved across zoom.
         const contentAnchor = {
-          x: (pivotCanvas.x - panOffsetRef.current.x) / oldZoom,
-          y: (pivotCanvas.y - panOffsetRef.current.y) / oldZoom,
+          x: (pivotCanvas.x - fo.x - panOffsetRef.current.x) / (fs * oldZoom),
+          y: (pivotCanvas.y - fo.y - panOffsetRef.current.y) / (fs * oldZoom),
         };
         setZoom(clamped);
         setPanOffset({
-          x: pivotCanvas.x - contentAnchor.x * clamped,
-          y: pivotCanvas.y - contentAnchor.y * clamped,
+          x: pivotCanvas.x - fo.x - contentAnchor.x * fs * clamped,
+          y: pivotCanvas.y - fo.y - contentAnchor.y * fs * clamped,
         });
         return clamped;
       };
@@ -271,14 +295,16 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
           const newZoom = zoomRef.current * (dist / lastPinchDist);
           const clamped = Math.min(Math.max(newZoom, MIN_ZOOM), MAX_ZOOM);
+          const fs = fitScaleRef.current;
+          const fo = fitOffsetRef.current;
           const contentAnchor = {
-            x: (pivotCanvas.x - panOffsetRef.current.x) / zoomRef.current,
-            y: (pivotCanvas.y - panOffsetRef.current.y) / zoomRef.current,
+            x: (pivotCanvas.x - fo.x - panOffsetRef.current.x) / (fs * zoomRef.current),
+            y: (pivotCanvas.y - fo.y - panOffsetRef.current.y) / (fs * zoomRef.current),
           };
           setZoom(clamped);
           setPanOffset({
-            x: pivotCanvas.x - contentAnchor.x * clamped + (center.x - lastPinchCenter.x),
-            y: pivotCanvas.y - contentAnchor.y * clamped + (center.y - lastPinchCenter.y),
+            x: pivotCanvas.x - fo.x - contentAnchor.x * fs * clamped + (center.x - lastPinchCenter.x),
+            y: pivotCanvas.y - fo.y - contentAnchor.y * fs * clamped + (center.y - lastPinchCenter.y),
           });
 
           lastPinchDist = dist;
@@ -349,9 +375,9 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const layouts = useMemo(
       () =>
         canvasMode === 'templates'
-          ? computeTemplateLayouts(templateTypes, templateImages, stageSize)
+          ? computeTemplateLayouts(templateTypes, templateImages)
           : [],
-      [canvasMode, templateTypes, templateImages, stageSize],
+      [canvasMode, templateTypes, templateImages],
     );
 
     const resolvedGuidePoints = useMemo(
@@ -361,10 +387,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
     const { snap, clearSnap, snapIndicator } = useSnapping(
       objects,
-      stageSize,
       zoom,
       12,
       resolvedGuidePoints,
+      fitScale,
     );
 
     const strokePixelWidth = STROKE_SIZES[strokeSize];
@@ -384,16 +410,18 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           const previousPosition = { x: stage.x(), y: stage.y() };
 
           try {
+            stage.size({ width: WORLD_SIZE.width, height: WORLD_SIZE.height });
             stage.scale({ x: 1, y: 1 });
             stage.position({ x: 0, y: 0 });
             stage.batchDraw();
 
             const pixelRatio = maxDimension
-              ? Math.min(1, maxDimension / Math.max(stageSize.width, stageSize.height))
+              ? Math.min(1, maxDimension / Math.max(WORLD_SIZE.width, WORLD_SIZE.height))
               : 1;
 
             return stage.toDataURL({ pixelRatio });
           } finally {
+            stage.size({ width: stageSize.width, height: stageSize.height });
             stage.scale(previousScale);
             stage.position(previousPosition);
             stage.batchDraw();
@@ -433,8 +461,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return;
         }
 
-        const startPx = { x: obj.start.x * stageSize.width, y: obj.start.y * stageSize.height };
-        const axisX = findAxisXForPoint(startPx, layouts, stageSize);
+        // obj.start is already in world pixels — no multiplication needed.
+        const axisX = findAxisXForPoint(obj.start, layouts);
         const mirrorId = createStrokeId();
 
         const original = { ...obj, mirrorId };
@@ -447,12 +475,11 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
         onObjectsComplete([original, mirrored]);
       },
-      [symmetryEnabled, onObjectComplete, onObjectsComplete, layouts, stageSize],
+      [symmetryEnabled, onObjectComplete, onObjectsComplete, layouts],
     );
 
     const commonVectorOpts = {
       stageRef,
-      stageSize,
       color,
       strokeSize,
       onObjectComplete: effectiveOnObjectComplete,
@@ -467,20 +494,17 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
 
     const eraserTool = useEraserTool({
       stageRef,
-      stageSize,
       objects,
       onDeleteObjects,
     });
 
     const selectTool = useSelectTool({
       stageRef,
-      stageSize,
       objects,
     });
 
     const textTool = useTextTool({
       stageRef,
-      stageSize,
       color,
       onObjectComplete,
     });
@@ -521,10 +545,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const mirrorPreviewPoints = useMemo(() => {
       if (!symmetryEnabled || !activePreviewPoints) return null;
       const [sx = 0, sy = 0, ex = 0, ey = 0] = activePreviewPoints;
-      const axisX = findAxisXForPoint({ x: sx, y: sy }, layouts, stageSize);
-      const axisXpx = axisX * stageSize.width;
-      return [2 * axisXpx - sx, sy, 2 * axisXpx - ex, ey];
-    }, [symmetryEnabled, activePreviewPoints, layouts, stageSize]);
+      // sx/sy are world pixels; findAxisXForPoint returns world-pixel axisX.
+      const axisX = findAxisXForPoint({ x: sx, y: sy }, layouts);
+      return [2 * axisX - sx, sy, 2 * axisX - ex, ey];
+    }, [symmetryEnabled, activePreviewPoints, layouts]);
 
     return (
       <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool === 'pencil' ? activeDrawingTool : tool}`}>
@@ -532,10 +556,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           ref={stageRef}
           width={stageSize.width}
           height={stageSize.height}
-          scaleX={zoom}
-          scaleY={zoom}
-          x={panOffset.x}
-          y={panOffset.y}
+          scaleX={fitScale * zoom}
+          scaleY={fitScale * zoom}
+          x={fitOffset.x + panOffset.x}
+          y={fitOffset.y + panOffset.y}
           onPointerDown={(e) => {
             if (!isPinchingRef.current) (rawHandlers.onPointerDown as StagePointerHandler)(e);
           }}
@@ -550,16 +574,13 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           }}
         >
           {canvasMode === 'templates' ? (
-            <BackgroundLayer stageSize={stageSize} layouts={layouts} />
+            <BackgroundLayer layouts={layouts} />
           ) : (
-            <ImageCanvasLayer dataUrl={imageDataUrl ?? ''} stageSize={stageSize} />
+            <ImageCanvasLayer dataUrl={imageDataUrl ?? ''} />
           )}
           <GuideLayer layouts={layouts} showGuides={showGuides} isExporting={isExporting} />
           <ObjectsLayer
             objects={objects}
-            stageSize={stageSize}
-            zoom={zoom}
-            panOffset={panOffset}
             hiddenObjectIds={editingObjectIds.size > 0 ? editingObjectIds : undefined}
           />
           <LiveLayer
@@ -573,7 +594,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           <SelectionLayer
             objects={objects}
             selectedObjectIds={tool === 'select' ? selectedObjectIds : []}
-            stageSize={stageSize}
             zoom={zoom}
             onUpdateObject={onUpdateObject}
             snapIndicator={snapIndicator}
@@ -588,12 +608,13 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             onDraftEnd={() => setEditingObjectIds(new Set())}
           />
           {isExporting && (
-            <TextAnnotationsExportLayer objects={objects} stageSize={stageSize} />
+            <TextAnnotationsExportLayer objects={objects} />
           )}
         </Stage>
         <TextAnnotationsOverlay
           objects={objects}
-          stageSize={stageSize}
+          fitScale={fitScale}
+          fitOffset={fitOffset}
           zoom={zoom}
           panOffset={panOffset}
           isExporting={isExporting}

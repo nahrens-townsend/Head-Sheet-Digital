@@ -4,20 +4,17 @@ import Konva from 'konva'
 import type { CanvasObject } from '../../types/canvasObject'
 import {
   getStagePoint,
-  type StageSize,
 } from '../utils/canvasUtils'
 import { hitTestCanvasObject, eraserThreshold } from '../utils/hitTest'
 
 interface UseEraserToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
-  stageSize: StageSize
   objects: CanvasObject[]
   onDeleteObjects: (ids: string[]) => void
 }
 
 export function useEraserTool({
   stageRef,
-  stageSize,
   objects,
   onDeleteObjects,
 }: UseEraserToolOptions) {
@@ -33,32 +30,32 @@ export function useEraserTool({
             // never delete legacy raster-eraser masks (destination-out objects)
             obj.type !== 'eraser' &&
             !pendingRef.current.has(obj.id) &&
-            hitTestCanvasObject(obj, px, stageSize, eraserThreshold(obj)),
+            hitTestCanvasObject(obj, px, eraserThreshold(obj)),
         )
         .forEach((obj) => pendingRef.current.add(obj.id))
     },
-    [objects, stageSize],
+    [objects],
   )
 
   const onPointerDown = useCallback(
     () => {
-      const px = getStagePoint(stageRef, stageSize)
+      const px = getStagePoint(stageRef)
       if (!px) return
       isActiveRef.current = true
       pendingRef.current = new Set()
       collectHits(px)
     },
-    [collectHits, stageRef, stageSize],
+    [collectHits, stageRef],
   )
 
   const onPointerMove = useCallback(
     () => {
       if (!isActiveRef.current) return
-      const px = getStagePoint(stageRef, stageSize)
+      const px = getStagePoint(stageRef)
       if (!px) return
       collectHits(px)
     },
-    [collectHits, stageRef, stageSize],
+    [collectHits, stageRef],
   )
 
   // Commit the whole gesture as a single undo step on pointer-up
