@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { CanvasObject } from '../../types/canvasObject'
-import { denormalizePoint, type Point, type StageSize } from './canvasUtils'
+import type { Point } from './canvasUtils'
 import type { ResolvedGuidePoint } from './guidePoints'
 
 export interface SnapResult {
@@ -25,15 +25,17 @@ const GUIDE_SNAP_COLOR = '#ff2222'
  *   1. LineObject endpoint snap (purple indicator)
  *   2. Guide point snap (red indicator)
  *
- * `zoom` is used to convert the screen-space snap radius to canvas content-space
- * so the snap zone feels consistent regardless of zoom level.
+ * All coordinates are in world pixels [0..WORLD_SIZE].
+ * `zoom` and `fitScale` are used to convert the screen-space snap radius to
+ * world-space pixels so the snap zone feels consistent regardless of zoom level
+ * or container size.
  */
 export function useSnapping(
   objects: CanvasObject[],
-  stageSize: StageSize,
   zoom = 1,
   snapRadius = 12,
   guidePoints: ResolvedGuidePoint[] = [],
+  fitScale = 1,
 ): {
   snap: SnapFn
   clearSnap: () => void
@@ -43,23 +45,21 @@ export function useSnapping(
 
   const snap = useCallback(
     (p: Point, excludeId?: string): SnapResult => {
-      const effectiveRadius = snapRadius / zoom
+      const effectiveRadius = snapRadius / (fitScale * zoom)
 
       // 1. Endpoint snap (highest priority)
       for (const obj of objects) {
         if (obj.id === excludeId) continue
         if (obj.type !== 'line' && obj.type !== 'arrow' && obj.type !== 'dotted') continue
 
-        const startPx = denormalizePoint(obj.start, stageSize)
-        if (Math.hypot(p.x - startPx.x, p.y - startPx.y) <= effectiveRadius) {
-          setSnapIndicator({ point: startPx, color: ENDPOINT_SNAP_COLOR })
-          return { point: startPx, snapped: true, targetId: obj.id }
+        if (Math.hypot(p.x - obj.start.x, p.y - obj.start.y) <= effectiveRadius) {
+          setSnapIndicator({ point: obj.start, color: ENDPOINT_SNAP_COLOR })
+          return { point: obj.start, snapped: true, targetId: obj.id }
         }
 
-        const endPx = denormalizePoint(obj.end, stageSize)
-        if (Math.hypot(p.x - endPx.x, p.y - endPx.y) <= effectiveRadius) {
-          setSnapIndicator({ point: endPx, color: ENDPOINT_SNAP_COLOR })
-          return { point: endPx, snapped: true, targetId: obj.id }
+        if (Math.hypot(p.x - obj.end.x, p.y - obj.end.y) <= effectiveRadius) {
+          setSnapIndicator({ point: obj.end, color: ENDPOINT_SNAP_COLOR })
+          return { point: obj.end, snapped: true, targetId: obj.id }
         }
       }
 
@@ -74,7 +74,7 @@ export function useSnapping(
       setSnapIndicator(null)
       return { point: p, snapped: false }
     },
-    [objects, stageSize, zoom, snapRadius, guidePoints],
+    [objects, zoom, fitScale, snapRadius, guidePoints],
   )
 
   const clearSnap = useCallback(() => setSnapIndicator(null), [])

@@ -4,23 +4,20 @@ import Konva from 'konva'
 import type { TextObject } from '../../types/canvasObject'
 import {
   getStagePoint,
-  normalizePoint,
   createStrokeId,
-  type StageSize,
 } from '../utils/canvasUtils'
 
 interface UseTextToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
-  stageSize: StageSize
   color: string
   onObjectComplete: (object: TextObject) => void
 }
 
-export function useTextTool({ stageRef, stageSize, color, onObjectComplete }: UseTextToolOptions) {
+export function useTextTool({ stageRef, color, onObjectComplete }: UseTextToolOptions) {
   const onPointerDown = useCallback(() => {
-    const raw = getStagePoint(stageRef, stageSize)
+    const raw = getStagePoint(stageRef)
     if (!raw) return
-    const norm = normalizePoint(raw, stageSize)
+    // Coordinates stored in world pixels [0..WORLD_SIZE] — no normalization needed.
     onObjectComplete({
       type: 'text',
       id: createStrokeId(),
@@ -28,11 +25,11 @@ export function useTextTool({ stageRef, stageSize, color, onObjectComplete }: Us
       color,
       width: 'md',
       opacity: 1,
-      x: norm.x,
-      y: norm.y,
+      x: raw.x,
+      y: raw.y,
       text: '',
     })
-  }, [stageRef, stageSize, color, onObjectComplete])
+  }, [stageRef, color, onObjectComplete])
 
   // Text is placed on click only — no preview during move.
   const onPointerMove = useCallback(() => {}, [])

@@ -1,6 +1,9 @@
 import type React from 'react'
 import Konva from 'konva'
 
+/** Fixed world canvas dimensions (pixels). All object coordinates are stored in this space. */
+export const WORLD_SIZE = { width: 1200, height: 900 } as const
+
 export interface StageSize {
   width: number
   height: number
@@ -31,43 +34,57 @@ export const PALETTE: readonly string[] = [
   '#6d4c41', '#546e7a', '#00897b', '#fdd835',
 ]
 
+/**
+ * Returns the pointer position in world-space pixels [0..WORLD_SIZE], or null
+ * if the pointer is outside the world (e.g. in the letterbox margin).
+ * getRelativePointerPosition() accounts for the stage's scaleX/scaleY and x/y
+ * (fitScale × zoom, fitOffset + panOffset), returning world-space coordinates.
+ */
 export function getStagePoint(
   stageRef: React.RefObject<Konva.Stage | null>,
-  stageSize: StageSize,
 ): Point | null {
   const stage = stageRef.current
-  // getRelativePointerPosition accounts for stage scaleX/scaleY and x/y (zoom + pan),
-  // returning the pointer position in canvas content-space rather than screen-space.
   const point = stage?.getRelativePointerPosition()
+  if (!stage || !point) return null
+  if (
+    point.x < 0 || point.x > WORLD_SIZE.width ||
+    point.y < 0 || point.y > WORLD_SIZE.height
+  ) return null
+  return { x: point.x, y: point.y }
+}
 
-  if (!stage || !point || stageSize.width <= 0 || stageSize.height <= 0) {
-    return null
-  }
-
+/**
+ * Convert world-space coordinates to DOM screen pixels.
+ * Used by DOM overlays (TextAnnotationsOverlay) to position elements.
+ */
+export function worldToScreen(
+  world: Point,
+  fitScale: number,
+  fitOffset: Point,
+  zoom: number,
+  panOffset: Point,
+): Point {
   return {
-    x: Math.min(Math.max(point.x, 0), stageSize.width),
-    y: Math.min(Math.max(point.y, 0), stageSize.height),
+    x: world.x * fitScale * zoom + fitOffset.x + panOffset.x,
+    y: world.y * fitScale * zoom + fitOffset.y + panOffset.y,
   }
 }
 
-export function normalizePoints(points: number[], stageSize: StageSize): number[] {
-  return points.map((value, index) =>
-    index % 2 === 0 ? value / stageSize.width : value / stageSize.height,
-  )
-}
-
-export function denormalizePoints(points: number[], stageSize: StageSize): number[] {
-  return points.map((value, index) =>
-    index % 2 === 0 ? value * stageSize.width : value * stageSize.height,
-  )
-}
-
-export function normalizePoint(p: Point, stageSize: StageSize): Point {
-  return { x: p.x / stageSize.width, y: p.y / stageSize.height }
-}
-
-export function denormalizePoint(p: Point, stageSize: StageSize): Point {
-  return { x: p.x * stageSize.width, y: p.y * stageSize.height }
+/**
+ * Convert DOM screen pixels to world-space coordinates.
+ * Used when converting pointer drag deltas to world deltas.
+ */
+export function screenToWorld(
+  screen: Point,
+  fitScale: number,
+  fitOffset: Point,
+  zoom: number,
+  panOffset: Point,
+): Point {
+  return {
+    x: (screen.x - fitOffset.x - panOffset.x) / (fitScale * zoom),
+    y: (screen.y - fitOffset.y - panOffset.y) / (fitScale * zoom),
+  }
 }
 
 export function createStrokeId(): string {

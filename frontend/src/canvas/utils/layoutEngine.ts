@@ -1,5 +1,5 @@
 import type { TemplateType } from '../../types/headSheet'
-import type { StageSize } from './canvasUtils'
+import { WORLD_SIZE } from './canvasUtils'
 
 export interface TemplateLayout {
   type: TemplateType
@@ -32,10 +32,10 @@ function fitImageInCell(
 }
 
 /**
- * Computes pixel rects for each template image within the stage.
+ * Computes pixel rects for each template image within the world canvas.
  *
  * Grid rules:
- *   1 template  — centred, fills stage minus outerPad on all sides
+ *   1 template  — centred, fills world canvas minus outerPad on all sides
  *   2 templates — side by side, equal widths, padding between
  *   3 templates — 2 top + 1 centred bottom
  *   4 templates — 2×2 grid, equal cells
@@ -43,12 +43,11 @@ function fitImageInCell(
 export function computeTemplateLayouts(
   types: TemplateType[],
   images: Map<TemplateType, HTMLImageElement>,
-  stageSize: StageSize,
   padding = 80,
   outerPad = 60,
 ): TemplateLayout[] {
-  const availW = stageSize.width - 2 * outerPad
-  const availH = stageSize.height - 2 * outerPad
+  const availW = WORLD_SIZE.width - 2 * outerPad
+  const availH = WORLD_SIZE.height - 2 * outerPad
 
   const cells = ((): CellBounds[] => {
     switch (types.length) {

@@ -390,6 +390,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       zoom,
       12,
       resolvedGuidePoints,
+      fitScale,
     );
 
     const strokePixelWidth = STROKE_SIZES[strokeSize];

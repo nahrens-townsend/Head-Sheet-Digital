@@ -2,17 +2,16 @@ import { useCallback } from 'react'
 import type React from 'react'
 import Konva from 'konva'
 import type { CanvasObject } from '../../types/canvasObject'
-import { getStagePoint, type StageSize, type StagePointerEvent } from '../utils/canvasUtils'
+import { getStagePoint, type StagePointerEvent } from '../utils/canvasUtils'
 import { hitTestCanvasObject, selectThreshold } from '../utils/hitTest'
 import { useCanvasStore } from '../../stores/canvasStore'
 
 interface UseSelectToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
-  stageSize: StageSize
   objects: CanvasObject[]
 }
 
-export function useSelectTool({ stageRef, stageSize, objects }: UseSelectToolOptions) {
+export function useSelectTool({ stageRef, objects }: UseSelectToolOptions) {
   const { setSelectedObjectIds } = useCanvasStore()
 
   const onPointerDown = useCallback(
@@ -21,14 +20,14 @@ export function useSelectTool({ stageRef, stageSize, objects }: UseSelectToolOpt
       // Konva handle it and don't change the selection.
       if ((event.target as Konva.Node).draggable?.()) return
 
-      const px = getStagePoint(stageRef, stageSize)
+      const px = getStagePoint(stageRef)
       if (!px) return
 
       // Find the topmost (last drawn) hittable object.
       for (let i = objects.length - 1; i >= 0; i--) {
         const obj = objects[i]
         if (
-          hitTestCanvasObject(obj, px, stageSize, selectThreshold(obj))
+          hitTestCanvasObject(obj, px, selectThreshold(obj))
         ) {
           const mirrorId = 'mirrorId' in obj ? (obj as { mirrorId?: string }).mirrorId : undefined
           const ids = mirrorId ? [obj.id, mirrorId] : [obj.id]
@@ -40,7 +39,7 @@ export function useSelectTool({ stageRef, stageSize, objects }: UseSelectToolOpt
       // No hit — clear selection.
       setSelectedObjectIds([])
     },
-    [objects, setSelectedObjectIds, stageRef, stageSize],
+    [objects, setSelectedObjectIds, stageRef],
   )
 
   return {

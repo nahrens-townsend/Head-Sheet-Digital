@@ -4,13 +4,8 @@ import type { CanvasObject } from '../../types/canvasObject'
 import { isLineObject } from '../../types/canvasObject'
 import type { SnapFn, SnapIndicator } from '../utils/snapping'
 import {
-  denormalizePoint,
-  denormalizePoints,
-  normalizePoint,
-  normalizePoints,
   STROKE_SIZES,
   type Point,
-  type StageSize,
 } from '../utils/canvasUtils'
 
 const HANDLE_RADIUS = 7
@@ -175,7 +170,6 @@ function ControlHandle({
 interface SelectionLayerProps {
   objects: CanvasObject[]
   selectedObjectIds: string[]
-  stageSize: StageSize
   zoom: number
   onUpdateObject: (id: string, updater: (obj: CanvasObject) => CanvasObject) => void
   snapIndicator?: SnapIndicator | null
@@ -189,7 +183,6 @@ interface SelectionLayerProps {
 export function SelectionLayer({
   objects,
   selectedObjectIds,
-  stageSize,
   zoom,
   onUpdateObject,
   snapIndicator = null,
@@ -199,11 +192,6 @@ export function SelectionLayer({
   onDraftStart,
   onDraftEnd,
 }: SelectionLayerProps) {
-  // Ref so drag callbacks always see the latest stageSize even after a window resize
-  const stageSizeRef = useRef(stageSize)
-  useEffect(() => {
-    stageSizeRef.current = stageSize
-  }, [stageSize])
 
   // Keep refs to draft state and onDraftEnd so the unmount cleanup can safely call it.
   const onDraftEndRef = useRef(onDraftEnd)
@@ -252,7 +240,7 @@ export function SelectionLayer({
       {selectedObjects.map((obj) => {
         // ── Pen stroke ──────────────────────────────────────────────────────
         if (obj.type === 'pen') {
-          const committedPts = denormalizePoints(obj.points, stageSize)
+          const committedPts = obj.points
           const draftPen = draftState?.kind === 'pen' && draftState.id === obj.id
             ? draftState
             : null
@@ -312,7 +300,7 @@ export function SelectionLayer({
                   bodyDragRef.current = {
                     kind: 'pen',
                     id: obj.id,
-                    snapPoints: denormalizePoints(obj.points, stageSizeRef.current),
+                    snapPoints: obj.points,
                     pointerStart: ptr,
                     lastDx: 0,
                     lastDy: 0,
@@ -345,10 +333,9 @@ export function SelectionLayer({
                   // Fall back to last known delta if pointer is unavailable on release
                   const dx = ptr ? ptr.x - ref.pointerStart.x : ref.lastDx
                   const dy = ptr ? ptr.y - ref.pointerStart.y : ref.lastDy
-                  const ss = stageSizeRef.current
                   const newPts = ref.snapPoints.map((v, i) => (i % 2 === 0 ? v + dx : v + dy))
                   onUpdateObject(obj.id, (o) =>
-                    o.type === 'pen' ? { ...o, points: normalizePoints(newPts, ss) } : o,
+                    o.type === 'pen' ? { ...o, points: newPts } : o,
                   )
                   setDraftState(null)
                   onDraftEnd?.()
@@ -360,9 +347,9 @@ export function SelectionLayer({
 
         // ── LineObject (line / arrow / dotted) ──────────────────────────────
         if (isLineObject(obj)) {
-          const cStart = denormalizePoint(obj.start, stageSize)
-          const cMid   = denormalizePoint(obj.mid,   stageSize)
-          const cEnd   = denormalizePoint(obj.end,   stageSize)
+          const cStart = obj.start
+          const cMid   = obj.mid
+          const cEnd   = obj.end
 
           const draftLine = draftState?.kind === 'line' && draftState.id === obj.id
             ? draftState
@@ -447,7 +434,7 @@ export function SelectionLayer({
                   if (obj.mirrorId) {
                     const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
                     if (mirrorObj && isLineObject(mirrorObj)) {
-                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      const axisXpx = (obj.start.x + mirrorObj.start.x) / 2
                       mirrorDraft = {
                         id: mirrorObj.id,
                         start: mirrorPointPx(newStart, axisXpx),
@@ -492,15 +479,13 @@ export function SelectionLayer({
                     }
                     clearSnap?.()
                   }
-
-                  const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
                       ? {
                           ...o,
-                          start: normalizePoint(newStart, ss),
-                          mid:   normalizePoint(newMid,   ss),
-                          end:   normalizePoint(newEnd,   ss),
+                          start: newStart,
+                          mid:   newMid,
+                          end:   newEnd,
                         }
                       : o,
                   )
@@ -563,7 +548,7 @@ export function SelectionLayer({
                   if (obj.mirrorId) {
                     const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
                     if (mirrorObj && isLineObject(mirrorObj)) {
-                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      const axisXpx = (obj.start.x + mirrorObj.start.x) / 2
                       mirrorDraft = {
                         id: mirrorObj.id,
                         start: mirrorPointPx(sp,     axisXpx),
@@ -579,10 +564,9 @@ export function SelectionLayer({
                   const sp = sr?.point ?? p
                   clearSnap?.()
                   const newMid = recomputeMid(sp, cEnd, cStart, cMid, cEnd)
-                  const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, start: normalizePoint(sp, ss), mid: normalizePoint(newMid, ss) }
+                      ? { ...o, start: sp, mid: newMid }
                       : o,
                   )
                   setDraftState(null)
@@ -601,7 +585,7 @@ export function SelectionLayer({
                   if (obj.mirrorId) {
                     const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
                     if (mirrorObj && isLineObject(mirrorObj)) {
-                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      const axisXpx = (obj.start.x + mirrorObj.start.x) / 2
                       mirrorDraft = {
                         id: mirrorObj.id,
                         start: mirrorPointPx(cStart, axisXpx),
@@ -616,17 +600,14 @@ export function SelectionLayer({
                   const ctrl = ctrlFromOnCurve(p, cStart, cEnd)
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(ctrl, stageSizeRef.current) }
+                      ? { ...o, mid: ctrl }
                       : o,
                   )
                   setDraftState(null)
                   onDraftEnd?.()
                 }}
                 onDblClick={() => {
-                  const straightMid = normalizePoint(
-                    { x: (cStart.x + cEnd.x) / 2, y: (cStart.y + cEnd.y) / 2 },
-                    stageSize,
-                  )
+                  const straightMid = { x: (cStart.x + cEnd.x) / 2, y: (cStart.y + cEnd.y) / 2 }
                   onUpdateObject(obj.id, (o) => ({ ...o, mid: straightMid }))
                 }}
               />
@@ -644,7 +625,7 @@ export function SelectionLayer({
                   if (obj.mirrorId) {
                     const mirrorObj = objects.find((o) => o.id === obj.mirrorId)
                     if (mirrorObj && isLineObject(mirrorObj)) {
-                      const axisXpx = ((obj.start.x + mirrorObj.start.x) / 2) * stageSizeRef.current.width
+                      const axisXpx = (obj.start.x + mirrorObj.start.x) / 2
                       mirrorDraft = {
                         id: mirrorObj.id,
                         start: mirrorPointPx(cStart, axisXpx),
@@ -660,10 +641,9 @@ export function SelectionLayer({
                   const ep = sr?.point ?? p
                   clearSnap?.()
                   const newMid = recomputeMid(cStart, ep, cStart, cMid, cEnd)
-                  const ss = stageSizeRef.current
                   onUpdateObject(obj.id, (o) =>
                     isLineObject(o)
-                      ? { ...o, mid: normalizePoint(newMid, ss), end: normalizePoint(ep, ss) }
+                      ? { ...o, mid: newMid, end: ep }
                       : o,
                   )
                   setDraftState(null)

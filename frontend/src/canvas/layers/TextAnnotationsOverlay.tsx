@@ -3,11 +3,12 @@ import type React from 'react'
 import { useCanvasStore } from '../../stores/canvasStore'
 import type { CanvasObject, NoteObject, TextObject } from '../../types/canvasObject'
 import { isTextObject, isNoteObject } from '../../types/canvasObject'
-import type { Point, StageSize } from '../utils/canvasUtils'
+import { WORLD_SIZE, type Point } from '../utils/canvasUtils'
 
 interface TextAnnotationsOverlayProps {
   objects: CanvasObject[]
-  stageSize: StageSize
+  fitScale: number
+  fitOffset: Point
   zoom: number
   panOffset: Point
   isExporting: boolean
@@ -21,7 +22,8 @@ const DRAG_THRESHOLD_PX = 4
 
 export function TextAnnotationsOverlay({
   objects,
-  stageSize,
+  fitScale,
+  fitOffset,
   zoom,
   panOffset,
   isExporting,
@@ -95,11 +97,12 @@ export function TextAnnotationsOverlay({
         dr.moved = true
       }
       if (!dr.moved) return
-      const newX = Math.max(0, Math.min(1, dr.startX + dx / (stageSize.width * zoom)))
-      const newY = Math.max(0, Math.min(1, dr.startY + dy / (stageSize.height * zoom)))
+      // Convert screen delta to world pixels: divide by (fitScale * zoom).
+      const newX = Math.max(0, Math.min(WORLD_SIZE.width,  dr.startX + dx / (fitScale * zoom)))
+      const newY = Math.max(0, Math.min(WORLD_SIZE.height, dr.startY + dy / (fitScale * zoom)))
       setDragPos({ x: newX, y: newY })
     },
-    [stageSize, zoom],
+    [fitScale, zoom],
   )
 
   const handlePointerUp = useCallback(
@@ -109,15 +112,15 @@ export function TextAnnotationsOverlay({
       if (dr.moved) {
         const dx = e.clientX - dr.startClientX
         const dy = e.clientY - dr.startClientY
-        const newX = Math.max(0, Math.min(1, dr.startX + dx / (stageSize.width * zoom)))
-        const newY = Math.max(0, Math.min(1, dr.startY + dy / (stageSize.height * zoom)))
+        const newX = Math.max(0, Math.min(WORLD_SIZE.width,  dr.startX + dx / (fitScale * zoom)))
+        const newY = Math.max(0, Math.min(WORLD_SIZE.height, dr.startY + dy / (fitScale * zoom)))
         onUpdateObject(dr.objId, (obj) => ({ ...obj, x: newX, y: newY }) as CanvasObject)
       }
       dragRef.current = null
       setDraggingId(null)
       setDragPos(null)
     },
-    [stageSize, zoom, onUpdateObject],
+    [fitScale, zoom, onUpdateObject],
   )
 
   if (textObjects.length === 0 || isExporting) return null
@@ -127,8 +130,9 @@ export function TextAnnotationsOverlay({
       {textObjects.map((obj) => {
         const posX = draggingId === obj.id && dragPos ? dragPos.x : obj.x
         const posY = draggingId === obj.id && dragPos ? dragPos.y : obj.y
-        const screenX = posX * stageSize.width * zoom + panOffset.x
-        const screenY = posY * stageSize.height * zoom + panOffset.y
+        // World → screen: multiply by (fitScale * zoom) then add fitOffset + panOffset.
+        const screenX = posX * fitScale * zoom + fitOffset.x + panOffset.x
+        const screenY = posY * fitScale * zoom + fitOffset.y + panOffset.y
         const isSelected = selectedObjectIds.includes(obj.id)
         const isEditing = editingId === obj.id
         const isDragging = draggingId === obj.id
