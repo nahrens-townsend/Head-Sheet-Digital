@@ -89,12 +89,12 @@ export function CanvasToolbar({
 
         <button
           type="button"
-          className={`toolbar-btn ${tool === 'note' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('note')}
-          aria-label="Note tool"
-          title="Note"
+          className={`toolbar-btn ${tool === 'text' ? 'toolbar-btn--active' : ''}`}
+          onClick={() => setTool('text')}
+          aria-label="Text tool"
+          title="Text"
         >
-          🗒
+          T
         </button>
 
         <button

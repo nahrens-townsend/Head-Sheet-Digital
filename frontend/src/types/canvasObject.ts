@@ -32,6 +32,7 @@ export interface LineObject extends BaseCanvasObject {
   mirrorId?: string
 }
 
+/** Legacy sticky-note object. Kept for rendering of pre-v4 data; creation removed. */
 export interface NoteObject extends BaseCanvasObject {
   type: 'note'
   /** Normalized [0, 1] horizontal position in canvas space. */
@@ -42,20 +43,34 @@ export interface NoteObject extends BaseCanvasObject {
   noteColor: 'yellow' | 'pink' | 'green' | 'blue'
 }
 
-export type CanvasObject = PenStrokeObject | EraserStrokeObject | LineObject | NoteObject
+export interface TextObject extends BaseCanvasObject {
+  type: 'text'
+  /** Normalized [0, 1] horizontal position in canvas space. */
+  x: number
+  /** Normalized [0, 1] vertical position in canvas space. */
+  y: number
+  text: string
+}
+
+export type CanvasObject = PenStrokeObject | EraserStrokeObject | LineObject | NoteObject | TextObject
 
 /** Narrows any CanvasObject to the LineObject family (line / arrow / dotted). */
 export function isLineObject(obj: CanvasObject): obj is LineObject {
   return obj.type === 'line' || obj.type === 'arrow' || obj.type === 'dotted'
 }
 
-/** Narrows any CanvasObject to NoteObject. */
+/** Narrows any CanvasObject to NoteObject (legacy — pre-v4 sticky-note data). */
 export function isNoteObject(obj: CanvasObject): obj is NoteObject {
   return obj.type === 'note'
 }
 
+/** Narrows any CanvasObject to TextObject. */
+export function isTextObject(obj: CanvasObject): obj is TextObject {
+  return obj.type === 'text'
+}
+
 export interface CanvasData {
-  version: 3
+  version: 4
   objects: CanvasObject[]
 }
 
@@ -114,46 +129,50 @@ function migrateStroke(stroke: Stroke): CanvasObject {
   } satisfies PenStrokeObject
 }
 
-/** Parse server JSON (v1 Stroke[] or v2/v3 CanvasData) into a CanvasData object. */
+/** Migrate v3 objects to v4: convert legacy NoteObjects → TextObjects. */
+function migrateV3ToV4(objects: CanvasObject[]): CanvasData {
+  return {
+    version: 4,
+    objects: objects.map((obj): CanvasObject => {
+      if (obj.type !== 'note') return obj
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { noteColor: _noteColor, type: _type, ...rest } = obj
+      return { ...rest, type: 'text' } satisfies TextObject
+    }),
+  }
+}
+
+/** Parse server JSON (v1 Stroke[] or v2/v3/v4 CanvasData) into a v4 CanvasData object. */
 export function parseCanvasData(json: string): CanvasData {
   try {
     const parsed = JSON.parse(json) as unknown
-
-    // v3: current version
-    if (
+    const isVersioned = (_v: unknown, n: number): boolean =>
       parsed !== null &&
       typeof parsed === 'object' &&
       !Array.isArray(parsed) &&
-      (parsed as { version?: unknown }).version === 3 &&
+      (parsed as { version?: unknown }).version === n &&
       Array.isArray((parsed as { objects?: unknown }).objects)
-    ) {
-      return parsed as CanvasData
+
+    // v4: current version
+    if (isVersioned(parsed, 4)) return parsed as CanvasData
+
+    // v3: migrate NoteObject → TextObject
+    if (isVersioned(parsed, 3)) {
+      return migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)
     }
 
-    // v2: upgrade to v3 (no-op — NoteObject and mirrorId are both optional additions)
-    if (
-      parsed !== null &&
-      typeof parsed === 'object' &&
-      !Array.isArray(parsed) &&
-      (parsed as { version?: unknown }).version === 2 &&
-      Array.isArray((parsed as { objects?: unknown }).objects)
-    ) {
-      return {
-        version: 3,
-        objects: (parsed as { objects: CanvasObject[] }).objects,
-      }
+    // v2: was a no-op upgrade to v3; run migration to v4
+    if (isVersioned(parsed, 2)) {
+      return migrateV3ToV4((parsed as { objects: CanvasObject[] }).objects)
     }
 
     // v1: flat Stroke array
     if (Array.isArray(parsed)) {
-      return {
-        version: 3,
-        objects: (parsed as Stroke[]).map(migrateStroke),
-      }
+      return migrateV3ToV4((parsed as Stroke[]).map(migrateStroke))
     }
   } catch {
     // fall through
   }
 
-  return { version: 3, objects: [] }
+  return { version: 4, objects: [] }
 }

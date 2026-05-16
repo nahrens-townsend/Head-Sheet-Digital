@@ -47,5 +47,13 @@ export function duplicateObject(obj: CanvasObject): CanvasObject {
         x: obj.x + DUPLICATE_OFFSET,
         y: obj.y + DUPLICATE_OFFSET,
       }
+    case 'text':
+      return {
+        ...obj,
+        id,
+        createdAt,
+        x: obj.x + DUPLICATE_OFFSET,
+        y: obj.y + DUPLICATE_OFFSET,
+      }
   }
 }

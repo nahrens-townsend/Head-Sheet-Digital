@@ -1,4 +1,4 @@
-export type ToolType = 'select' | 'pencil' | 'note' | 'hand'
+export type ToolType = 'select' | 'pencil' | 'text' | 'hand'
 
 // Sub-tools active while tool === 'pencil'
 export type DrawingTool = 'line' | 'arrow' | 'dotted' | 'eraser'

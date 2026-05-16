@@ -13,12 +13,12 @@ import { Stage } from 'react-konva';
 import { useCanvasStore } from '../stores/canvasStore';
 import type { CanvasMode, TemplateType } from '../types/headSheet';
 import type { CanvasObject } from '../types/canvasObject';
-import { isNoteObject, isLineObject } from '../types/canvasObject';
+import { isLineObject } from '../types/canvasObject';
 import { useEraserTool } from './tools/useEraserTool';
 import { useLineTool } from './tools/useLineTool';
 import { useArrowLineTool } from './tools/useArrowLineTool';
 import { useDottedLineTool } from './tools/useDottedLineTool';
-import { useNoteTool } from './tools/useNoteTool';
+import { useTextTool } from './tools/useTextTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
@@ -26,8 +26,8 @@ import { STROKE_SIZES, createStrokeId, type StagePointerHandler, type StageSize 
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ImageCanvasLayer } from './layers/ImageCanvasLayer';
 import { GuideLayer } from './layers/GuideLayer';
-import { NotesExportLayer } from './layers/NotesExportLayer';
-import { NotesOverlay } from './layers/NotesOverlay';
+import { TextAnnotationsExportLayer } from './layers/TextAnnotationsExportLayer';
+import { TextAnnotationsOverlay } from './layers/TextAnnotationsOverlay';
 import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
@@ -478,9 +478,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       objects,
     });
 
-    const noteTool = useNoteTool({
+    const textTool = useTextTool({
       stageRef,
       stageSize,
+      color,
       onObjectComplete,
     });
 
@@ -488,8 +489,8 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       switch (tool) {
         case 'select':
           return selectTool;
-        case 'note':
-          return noteTool;
+        case 'text':
+          return textTool;
         case 'pencil':
           switch (activeDrawingTool) {
             case 'line':   return lineTool;
@@ -503,7 +504,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         default:
           return lineTool;
       }
-    }, [activeDrawingTool, arrowTool, dottedTool, eraserTool, lineTool, noteTool, selectTool, tool]);
+    }, [activeDrawingTool, arrowTool, dottedTool, eraserTool, lineTool, textTool, selectTool, tool]);
 
     const activePreviewPoints =
       tool === 'pencil'
@@ -587,10 +588,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             onDraftEnd={() => setEditingObjectIds(new Set())}
           />
           {isExporting && (
-            <NotesExportLayer notes={objects.filter(isNoteObject)} stageSize={stageSize} />
+            <TextAnnotationsExportLayer objects={objects} stageSize={stageSize} />
           )}
         </Stage>
-        <NotesOverlay
+        <TextAnnotationsOverlay
           objects={objects}
           stageSize={stageSize}
           zoom={zoom}

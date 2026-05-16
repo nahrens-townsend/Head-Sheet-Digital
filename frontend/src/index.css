@@ -641,6 +641,7 @@ code {
 .head-sheet-canvas--tool-eraser { cursor: cell; }
 .head-sheet-canvas--tool-hand   { cursor: grab; }
 .head-sheet-canvas--tool-note   { cursor: copy; }
+.head-sheet-canvas--tool-text   { cursor: copy; }
 .head-sheet-canvas--tool-arrow  { cursor: crosshair; }
 .head-sheet-canvas--tool-dotted { cursor: crosshair; }
 
@@ -940,3 +941,93 @@ code {
 }
 .note-color-picker__btn:hover { transform: scale(1.15); }
 .note-color-picker__btn--active { transform: scale(1.15); }
+
+/* ── Text annotations overlay ───────────────────────────────── */
+
+.text-annotations-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.text-annotation {
+  position: absolute;
+  pointer-events: auto;
+  user-select: none;
+  font: 14px/1.5 system-ui, -apple-system, sans-serif;
+  padding: 4px;
+  min-width: 60px;
+  max-width: 240px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  overflow: visible;
+}
+
+.text-annotation--selected {
+  border-color: rgba(0, 0, 0, 0.5);
+  border-style: dashed;
+}
+
+.text-annotation--dragging {
+  opacity: 0.85;
+}
+
+.text-annotation__text {
+  word-break: break-word;
+  white-space: pre-wrap;
+  min-height: 1.5em;
+  cursor: inherit;
+}
+
+.text-annotation__placeholder {
+  color: rgba(0, 0, 0, 0.35);
+  font-style: italic;
+}
+
+.text-annotation__textarea {
+  width: 100%;
+  min-height: 3em;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  resize: none;
+  font: inherit;
+  outline: 1px solid rgba(0, 0, 0, 0.25);
+  outline-offset: 1px;
+  border-radius: 2px;
+  padding: 0;
+  box-sizing: border-box;
+  color: inherit;
+}
+
+.text-annotation__delete {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s, background 0.1s;
+  pointer-events: auto;
+}
+
+.text-annotation:hover .text-annotation__delete,
+.text-annotation--selected .text-annotation__delete {
+  opacity: 1;
+}
+
+.text-annotation__delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
