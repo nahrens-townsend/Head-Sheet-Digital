@@ -1,6 +1,7 @@
 import { useCanvasStore } from '../stores/canvasStore'
 import { ColorPicker } from '../components/ColorPicker/ColorPicker'
 import { StrokeSizePicker } from '../components/BrushSizeSlider/StrokeSizePicker'
+import { DrawingToolPanel } from './DrawingToolPanel'
 import type { CanvasMode } from '../types/headSheet'
 
 interface CanvasToolbarProps {
@@ -41,7 +42,7 @@ export function CanvasToolbar({
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
-  const { tool, color, strokeSize, setTool, setColor, setStrokeSize, showGuides, setShowGuides, symmetryEnabled, setSymmetryEnabled } = useCanvasStore()
+  const { tool, activeDrawingTool, color, strokeSize, setTool, setActiveDrawingTool, setColor, setStrokeSize, showGuides, setShowGuides, symmetryEnabled, setSymmetryEnabled } = useCanvasStore()
 
   return (
     <div className="canvas-toolbar">
@@ -63,52 +64,28 @@ export function CanvasToolbar({
         >
           ☝
         </button>
-        <button
-          type="button"
-          className={`toolbar-btn ${symmetryEnabled ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setSymmetryEnabled(!symmetryEnabled)}
-          aria-label="Toggle symmetry"
-          aria-pressed={symmetryEnabled}
-          title="Symmetry (mirrors line, arrow, dotted)"
-        >
-          ⇔
-        </button>
-        <button
-          type="button"
-          className={`toolbar-btn ${tool === 'line' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('line')}
-          aria-label="Line tool"
-          title="Line"
-        >
-          ／
-        </button>
-        <button
-          type="button"
-          className={`toolbar-btn ${tool === 'arrow' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('arrow')}
-          aria-label="Arrow tool"
-          title="Arrow"
-        >
-          →
-        </button>
-        <button
-          type="button"
-          className={`toolbar-btn ${tool === 'dotted' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('dotted')}
-          aria-label="Dotted line tool"
-          title="Dotted line"
-        >
-          ⋯
-        </button>
-        <button
-          type="button"
-          className={`toolbar-btn ${tool === 'eraser' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('eraser')}
-          aria-label="Eraser tool"
-          title="Eraser"
+
+        {/* Pencil group — clicking activates pencil mode; sub-panel stays open while active */}
+        <div className="toolbar-pencil-group">
+          <button
+            type="button"
+            className={`toolbar-btn ${tool === 'pencil' ? 'toolbar-btn--active' : ''}`}
+            onClick={() => setTool('pencil')}
+            aria-label="Pencil tools"
+            aria-expanded={tool === 'pencil'}
+            title="Pencil tools"
           >
-          ⌫
-        </button>
+            ✏
+          </button>
+          {tool === 'pencil' && (
+            <DrawingToolPanel
+              activeDrawingTool={activeDrawingTool}
+              symmetryEnabled={symmetryEnabled}
+              onSelectDrawingTool={setActiveDrawingTool}
+              onToggleSymmetry={() => setSymmetryEnabled(!symmetryEnabled)}
+            />
+          )}
+        </div>
 
         <button
           type="button"

@@ -122,6 +122,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     const exportQueueRef = useRef(Promise.resolve() as Promise<void>);
     const {
       tool,
+      activeDrawingTool,
       color,
       strokeSize,
       selectedObjectIds,
@@ -489,29 +490,31 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return selectTool;
         case 'note':
           return noteTool;
-        case 'line':
-          return lineTool;
-        case 'arrow':
-          return arrowTool;
-        case 'dotted':
-          return dottedTool;
-        case 'eraser':
-          return eraserTool;
+        case 'pencil':
+          switch (activeDrawingTool) {
+            case 'line':   return lineTool;
+            case 'arrow':  return arrowTool;
+            case 'dotted': return dottedTool;
+            case 'eraser': return eraserTool;
+            default:       return lineTool;
+          }
         case 'hand':
           return selectTool; // hand uses native pan; Stage handlers receive no meaningful events
         default:
           return lineTool;
       }
-    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, selectTool, tool]);
+    }, [activeDrawingTool, arrowTool, dottedTool, eraserTool, lineTool, noteTool, selectTool, tool]);
 
     const activePreviewPoints =
-      tool === 'line'
-        ? lineTool.previewPoints
-        : tool === 'arrow'
-          ? arrowTool.previewPoints
-          : tool === 'dotted'
-            ? dottedTool.previewPoints
-            : null;
+      tool === 'pencil'
+        ? activeDrawingTool === 'line'
+          ? lineTool.previewPoints
+          : activeDrawingTool === 'arrow'
+            ? arrowTool.previewPoints
+            : activeDrawingTool === 'dotted'
+              ? dottedTool.previewPoints
+              : null
+        : null;
 
     // When symmetry is on, compute the mirror of any active vector-tool preview.
     const mirrorPreviewPoints = useMemo(() => {
@@ -523,7 +526,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     }, [symmetryEnabled, activePreviewPoints, layouts, stageSize]);
 
     return (
-      <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool}`}>
+      <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool === 'pencil' ? activeDrawingTool : tool}`}>
         <Stage
           ref={stageRef}
           width={stageSize.width}
@@ -559,7 +562,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             hiddenObjectIds={editingObjectIds.size > 0 ? editingObjectIds : undefined}
           />
           <LiveLayer
-            tool={tool}
+            activeDrawingTool={tool === 'pencil' ? activeDrawingTool : null}
             color={color}
             strokePixelWidth={strokePixelWidth}
             previewPoints={activePreviewPoints}

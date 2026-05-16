@@ -676,6 +676,41 @@ code {
   color: #ef4444;
 }
 
+/* ── Pencil group sub-panel ─────────────────────────────────── */
+.toolbar-pencil-group {
+  position: relative;
+}
+.drawing-tool-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 50;
+  white-space: nowrap;
+}
+.drawing-tool-panel__sep {
+  /* override toolbar-sep horizontal orientation for the panel */
+  margin: 0 2px;
+}
+
+@media (max-width: 640px) {
+  .drawing-tool-panel {
+    position: fixed;
+    top: 66px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
+
 
 
 .editor {

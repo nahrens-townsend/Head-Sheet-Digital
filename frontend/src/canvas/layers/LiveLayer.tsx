@@ -1,8 +1,8 @@
 import { Layer, Line, Shape } from 'react-konva'
-import type { ToolType } from '../../types/stroke'
+import type { DrawingTool } from '../../types/stroke'
 
 interface LiveLayerProps {
-  tool: ToolType
+  activeDrawingTool: DrawingTool | null
   color: string
   strokePixelWidth: number
   previewPoints: number[] | null
@@ -11,7 +11,7 @@ interface LiveLayerProps {
 }
 
 export function LiveLayer({
-  tool,
+  activeDrawingTool,
   color,
   strokePixelWidth,
   previewPoints,
@@ -25,7 +25,7 @@ export function LiveLayer({
   return (
     <Layer listening={false}>
       {/* Plain line preview (+ optional mirror) */}
-      {previewPoints && tool === 'line' && (
+      {previewPoints && activeDrawingTool === 'line' && (
         <>
           <Line
             points={previewPoints}
@@ -53,7 +53,7 @@ export function LiveLayer({
       )}
 
       {/* Dotted line preview (+ optional mirror) */}
-      {previewPoints && tool === 'dotted' && (
+      {previewPoints && activeDrawingTool === 'dotted' && (
         <>
           <Line
             points={previewPoints}
@@ -83,7 +83,7 @@ export function LiveLayer({
       )}
 
       {/* Arrow preview — custom Shape matching ObjectsLayer arrowhead fix (bezier stops at base) */}
-      {previewPoints && tool === 'arrow' && (
+      {previewPoints && activeDrawingTool === 'arrow' && (
         <>
           <Shape
             stroke={color}
