@@ -61,7 +61,7 @@ export function CanvasToolbar({
           aria-label="Select tool"
           title="Select"
         >
-          ↖
+          ☝
         </button>
         <button
           type="button"

@@ -161,7 +161,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                   height: 22,
                   borderRadius: '50%',
                   backgroundColor: color,
-                  border: 'none',
+                  border: (!isActive && i !== focusIndex) ? '1.5px solid rgba(0,0,0,0.25)' : 'none',
                   cursor: 'pointer',
                   padding: 0,
                   outline: 'none',
@@ -170,7 +170,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
                     ? '0 0 0 2px var(--bg), 0 0 0 4px #aa3bff'
                     : i === focusIndex
                     ? '0 0 0 2px var(--bg), 0 0 0 4px rgba(170,59,255,0.5)'
-                    : '0 0 0 1px rgba(0,0,0,0.12)',
+                    : 'none',
                 }}
               />
             )
