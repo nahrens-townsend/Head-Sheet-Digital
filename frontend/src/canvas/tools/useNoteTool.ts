@@ -4,22 +4,19 @@ import Konva from 'konva'
 import type { NoteObject } from '../../types/canvasObject'
 import {
   getStagePoint,
-  normalizePoint,
   createStrokeId,
-  type StageSize,
 } from '../utils/canvasUtils'
 
 interface UseNoteToolOptions {
   stageRef: React.RefObject<Konva.Stage | null>
-  stageSize: StageSize
   onObjectComplete: (object: NoteObject) => void
 }
 
-export function useNoteTool({ stageRef, stageSize, onObjectComplete }: UseNoteToolOptions) {
+export function useNoteTool({ stageRef, onObjectComplete }: UseNoteToolOptions) {
   const onPointerDown = useCallback(() => {
-    const raw = getStagePoint(stageRef, stageSize)
+    const raw = getStagePoint(stageRef)
     if (!raw) return
-    const norm = normalizePoint(raw, stageSize)
+    // Coordinates stored in world pixels [0..WORLD_SIZE] — no normalization needed.
     onObjectComplete({
       type: 'note',
       id: createStrokeId(),
@@ -27,12 +24,12 @@ export function useNoteTool({ stageRef, stageSize, onObjectComplete }: UseNoteTo
       color: '#1a1a1a',
       width: 'md',
       opacity: 1,
-      x: norm.x,
-      y: norm.y,
+      x: raw.x,
+      y: raw.y,
       text: '',
       noteColor: 'yellow',
     })
-  }, [stageRef, stageSize, onObjectComplete])
+  }, [stageRef, onObjectComplete])
 
   // Notes are placed on click only — no preview during move.
   const onPointerMove = useCallback(() => {}, [])
