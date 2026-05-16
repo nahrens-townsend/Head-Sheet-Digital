@@ -19,7 +19,6 @@ import { useLineTool } from './tools/useLineTool';
 import { useArrowLineTool } from './tools/useArrowLineTool';
 import { useDottedLineTool } from './tools/useDottedLineTool';
 import { useNoteTool } from './tools/useNoteTool';
-import { usePenTool } from './tools/usePenTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
@@ -33,7 +32,7 @@ import { ObjectsLayer } from './layers/ObjectsLayer';
 import { LiveLayer } from './layers/LiveLayer';
 import { SelectionLayer } from './layers/SelectionLayer';
 import { computeTemplateLayouts } from './utils/layoutEngine';
-import { mirrorLineAcrossAxis, mirrorNormalizedPointsAcrossAxis, findAxisXForPoint } from './utils/symmetry';
+import { mirrorLineAcrossAxis, findAxisXForPoint } from './utils/symmetry';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
@@ -117,8 +116,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const stageRef = useRef<Konva.Stage | null>(null);
-    const liveLineRef = useRef<Konva.Line | null>(null);
-    const mirrorLiveLineRef = useRef<Konva.Line | null>(null);
     const [stageSize, setStageSize] = useState<StageSize>({ width: 1, height: 1 });
     const [isExporting, setIsExporting] = useState(false);
     const [editingObjectIds, setEditingObjectIds] = useState<Set<string>>(new Set());
@@ -422,11 +419,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       [exportStage],
     );
 
-    /** Stable callback: normalized axis X for a pixel-space point. */
-    const getAxisX = useCallback(
-      (pointPx: { x: number; y: number }) => findAxisXForPoint(pointPx, layouts, stageSize),
-      [layouts, stageSize],
-    );
 
     /**
      * Intercepts object completion for pen/line/arrow/dotted tools.
@@ -435,40 +427,22 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
      */
     const effectiveOnObjectComplete = useCallback(
       (obj: CanvasObject) => {
-        if (!symmetryEnabled || (obj.type !== 'pen' && !isLineObject(obj))) {
+        if (!symmetryEnabled || !isLineObject(obj)) {
           onObjectComplete(obj);
           return;
         }
 
-        const startPx = isLineObject(obj)
-          ? { x: obj.start.x * stageSize.width, y: obj.start.y * stageSize.height }
-          : { x: (obj.points[0] ?? 0) * stageSize.width, y: (obj.points[1] ?? 0) * stageSize.height };
-
+        const startPx = { x: obj.start.x * stageSize.width, y: obj.start.y * stageSize.height };
         const axisX = findAxisXForPoint(startPx, layouts, stageSize);
         const mirrorId = createStrokeId();
 
-        let original: CanvasObject;
-        let mirrored: CanvasObject;
-
-        if (isLineObject(obj)) {
-          original = { ...obj, mirrorId };
-          mirrored = {
-            ...mirrorLineAcrossAxis(obj, axisX),
-            id: mirrorId,
-            mirrorId: obj.id,
-            createdAt: new Date().toISOString(),
-          };
-        } else {
-          // pen stroke
-          original = { ...obj, mirrorId };
-          mirrored = {
-            ...obj,
-            id: mirrorId,
-            mirrorId: obj.id,
-            points: mirrorNormalizedPointsAcrossAxis(obj.points, axisX),
-            createdAt: new Date().toISOString(),
-          };
-        }
+        const original = { ...obj, mirrorId };
+        const mirrored = {
+          ...mirrorLineAcrossAxis(obj, axisX),
+          id: mirrorId,
+          mirrorId: obj.id,
+          createdAt: new Date().toISOString(),
+        };
 
         onObjectsComplete([original, mirrored]);
       },
@@ -485,16 +459,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       clearSnap,
     };
 
-    const penTool = usePenTool({
-      stageRef,
-      liveLineRef,
-      stageSize,
-      color,
-      strokeSize,
-      onObjectComplete: effectiveOnObjectComplete,
-      mirrorLiveLineRef: symmetryEnabled ? mirrorLiveLineRef : undefined,
-      getAxisX: symmetryEnabled ? getAxisX : undefined,
-    });
 
     const lineTool = useLineTool(commonVectorOpts);
     const arrowTool = useArrowLineTool(commonVectorOpts);
@@ -535,11 +499,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return eraserTool;
         case 'hand':
           return selectTool; // hand uses native pan; Stage handlers receive no meaningful events
-        case 'pen':
         default:
-          return penTool;
+          return lineTool;
       }
-    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, penTool, selectTool, tool]);
+    }, [arrowTool, dottedTool, eraserTool, lineTool, noteTool, selectTool, tool]);
 
     const activePreviewPoints =
       tool === 'line'
@@ -596,8 +559,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             hiddenObjectIds={editingObjectIds.size > 0 ? editingObjectIds : undefined}
           />
           <LiveLayer
-            liveLineRef={liveLineRef}
-            mirrorLiveLineRef={mirrorLiveLineRef}
             tool={tool}
             color={color}
             strokePixelWidth={strokePixelWidth}

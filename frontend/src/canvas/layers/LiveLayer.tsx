@@ -1,11 +1,7 @@
-import type React from 'react'
-import Konva from 'konva'
 import { Layer, Line, Shape } from 'react-konva'
 import type { ToolType } from '../../types/stroke'
 
 interface LiveLayerProps {
-  liveLineRef: React.RefObject<Konva.Line | null>
-  mirrorLiveLineRef: React.RefObject<Konva.Line | null>
   tool: ToolType
   color: string
   strokePixelWidth: number
@@ -14,11 +10,7 @@ interface LiveLayerProps {
   isExporting?: boolean
 }
 
-const VECTOR_TOOLS: ToolType[] = ['line', 'arrow', 'dotted']
-
 export function LiveLayer({
-  liveLineRef,
-  mirrorLiveLineRef,
   tool,
   color,
   strokePixelWidth,
@@ -30,40 +22,8 @@ export function LiveLayer({
     return null
   }
 
-  const liveStrokeColor = tool === 'eraser' ? '#ffffff' : color
-  const liveStrokeWidth = tool === 'eraser' ? strokePixelWidth * 2 : strokePixelWidth
-  const isVectorTool = VECTOR_TOOLS.includes(tool)
-
   return (
     <Layer listening={false}>
-      {/* Freehand pen / eraser live stroke (hidden while drawing vector lines) */}
-      <Line
-        ref={liveLineRef}
-        points={[]}
-        stroke={liveStrokeColor}
-        strokeWidth={liveStrokeWidth}
-        opacity={1}
-        tension={0.35}
-        lineCap="round"
-        lineJoin="round"
-        strokeScaleEnabled={false}
-        visible={!isVectorTool}
-      />
-
-      {/* Mirror freehand stroke — updated in real time by usePenTool when symmetry is on */}
-      <Line
-        ref={mirrorLiveLineRef}
-        points={[]}
-        stroke={liveStrokeColor}
-        strokeWidth={liveStrokeWidth}
-        opacity={1}
-        tension={0.35}
-        lineCap="round"
-        lineJoin="round"
-        strokeScaleEnabled={false}
-        visible={!isVectorTool}
-      />
-
       {/* Plain line preview (+ optional mirror) */}
       {previewPoints && tool === 'line' && (
         <>

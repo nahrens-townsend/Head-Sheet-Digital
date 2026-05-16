@@ -26,7 +26,7 @@ interface CanvasState {
 }
 
 export const useCanvasStore = create<CanvasState>((set) => ({
-  tool: 'pen',
+  tool: 'line',
   color: '#1a1a1a',
   strokeSize: 'md',
   saveStatus: 'idle',

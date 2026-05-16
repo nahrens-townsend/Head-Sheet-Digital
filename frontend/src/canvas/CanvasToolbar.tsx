@@ -65,20 +65,11 @@ export function CanvasToolbar({
         </button>
         <button
           type="button"
-          className={`toolbar-btn ${tool === 'pen' ? 'toolbar-btn--active' : ''}`}
-          onClick={() => setTool('pen')}
-          aria-label="Pen tool"
-          title="Pen"
-        >
-          ✎
-        </button>
-        <button
-          type="button"
           className={`toolbar-btn ${symmetryEnabled ? 'toolbar-btn--active' : ''}`}
           onClick={() => setSymmetryEnabled(!symmetryEnabled)}
           aria-label="Toggle symmetry"
           aria-pressed={symmetryEnabled}
-          title="Symmetry (mirrors pen, line, arrow, dotted)"
+          title="Symmetry (mirrors line, arrow, dotted)"
         >
           ⇔
         </button>

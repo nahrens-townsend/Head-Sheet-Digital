@@ -97,8 +97,9 @@ export const ObjectsLayer = memo(function ObjectsLayer({
       {visibleObjects.map((obj) => {
         if (hiddenObjectIds?.has(obj.id)) return null
         if (obj.type === 'pen' || obj.type === 'eraser') {
+          // legacy: pen creation tool removed; pen objects from existing sheets still render here
           // Erasers render at 2× the logical stroke width to remain more
-          // effective than pen strokes — matching the live preview in LiveLayer.
+          // effective than pen strokes.
           const strokeWidth =
             obj.type === 'eraser' ? STROKE_SIZES[obj.width] * 2 : STROKE_SIZES[obj.width]
           return (
