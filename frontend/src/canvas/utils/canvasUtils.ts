@@ -35,10 +35,10 @@ export const PALETTE: readonly string[] = [
 ]
 
 /**
- * Returns the pointer position in world-space pixels [0..WORLD_SIZE], or null
- * if the pointer is outside the world (e.g. in the letterbox margin).
- * getRelativePointerPosition() accounts for the stage's scaleX/scaleY and x/y
- * (fitScale × zoom, fitOffset + panOffset), returning world-space coordinates.
+ * Returns the pointer position in world-space pixels, or null if the stage is
+ * not mounted or getRelativePointerPosition returns nothing.
+ * Coordinates may be outside [0..WORLD_SIZE] when the user is working in the
+ * infinite canvas area beyond the page boundary — callers should not reject them.
  */
 export function getStagePoint(
   stageRef: React.RefObject<Konva.Stage | null>,
@@ -46,10 +46,6 @@ export function getStagePoint(
   const stage = stageRef.current
   const point = stage?.getRelativePointerPosition()
   if (!stage || !point) return null
-  if (
-    point.x < 0 || point.x > WORLD_SIZE.width ||
-    point.y < 0 || point.y > WORLD_SIZE.height
-  ) return null
   return { x: point.x, y: point.y }
 }
 

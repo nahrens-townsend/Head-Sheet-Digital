@@ -42,7 +42,10 @@ export function CanvasToolbar({
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
-  const { tool, activeDrawingTool, color, strokeSize, setTool, setActiveDrawingTool, setColor, setStrokeSize, showGuides, setShowGuides, symmetryEnabled, setSymmetryEnabled } = useCanvasStore()
+  const { tool, activeDrawingTool, color, strokeSize, setTool, setActiveDrawingTool, setColor, setStrokeSize, showGuides, setShowGuides, symmetryEnabled, setSymmetryEnabled, zoom, panOffset, setZoom, setPanOffset } = useCanvasStore()
+
+  const isViewportDefault = zoom === 1.0 && panOffset.x === 0 && panOffset.y === 0
+  const resetViewport = () => { setZoom(1.0); setPanOffset({ x: 0, y: 0 }) }
 
   return (
     <div className="canvas-toolbar">
@@ -105,6 +108,16 @@ export function CanvasToolbar({
           title="Pan (Hand)"
         >
           ✋
+        </button>
+
+        <button
+          type="button"
+          className={`toolbar-btn${isViewportDefault ? ' toolbar-btn--dim' : ''}`}
+          onClick={resetViewport}
+          aria-label="Reset viewport"
+          title="Reset viewport (zoom 1:1, center page)"
+        >
+          ⊙
         </button>
 
         <span className="toolbar-sep" aria-hidden="true" />

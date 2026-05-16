@@ -36,6 +36,18 @@ import { mirrorLineAcrossAxis, findAxisXForPoint } from './utils/symmetry';
 
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 8;
+/** Maximum pan in world-pixels beyond the page edge in any direction. */
+const PAN_LIMIT_FACTOR = 2;
+
+/** Clamp panOffset so the world canvas stays within 2× its own size of the viewport. */
+function clampPanOffset(offset: Point, fitScaleVal: number, zoomVal: number): Point {
+  const maxX = WORLD_SIZE.width  * fitScaleVal * zoomVal * PAN_LIMIT_FACTOR;
+  const maxY = WORLD_SIZE.height * fitScaleVal * zoomVal * PAN_LIMIT_FACTOR;
+  return {
+    x: Math.max(-maxX, Math.min(maxX, offset.x)),
+    y: Math.max(-maxY, Math.min(maxY, offset.y)),
+  };
+}
 
 /** Loads one SVG per TemplateType and returns a Map keyed by type. */
 function useTemplateImages(types: TemplateType[]): Map<TemplateType, HTMLImageElement> {
@@ -276,10 +288,14 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
         if (isPanning) {
-          setPanOffset({
-            x: panOffsetAtStart.x + (e.clientX - panStart.x),
-            y: panOffsetAtStart.y + (e.clientY - panStart.y),
-          });
+          setPanOffset(clampPanOffset(
+            {
+              x: panOffsetAtStart.x + (e.clientX - panStart.x),
+              y: panOffsetAtStart.y + (e.clientY - panStart.y),
+            },
+            fitScaleRef.current,
+            zoomRef.current,
+          ));
           e.stopPropagation();
           return;
         }
@@ -302,10 +318,14 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             y: (pivotCanvas.y - fo.y - panOffsetRef.current.y) / (fs * zoomRef.current),
           };
           setZoom(clamped);
-          setPanOffset({
-            x: pivotCanvas.x - fo.x - contentAnchor.x * fs * clamped + (center.x - lastPinchCenter.x),
-            y: pivotCanvas.y - fo.y - contentAnchor.y * fs * clamped + (center.y - lastPinchCenter.y),
-          });
+          setPanOffset(clampPanOffset(
+            {
+              x: pivotCanvas.x - fo.x - contentAnchor.x * fs * clamped + (center.x - lastPinchCenter.x),
+              y: pivotCanvas.y - fo.y - contentAnchor.y * fs * clamped + (center.y - lastPinchCenter.y),
+            },
+            fs,
+            clamped,
+          ));
 
           lastPinchDist = dist;
           lastPinchCenter = center;
