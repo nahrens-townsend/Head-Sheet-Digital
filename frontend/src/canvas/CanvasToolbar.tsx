@@ -9,22 +9,13 @@ interface CanvasToolbarProps {
   canRedo: boolean
   canSaveTemplate: boolean
   canvasMode: CanvasMode
-  imageUploadStatus: 'idle' | 'uploading' | 'error'
   onUndo: () => void
   onRedo: () => void
   onExport: () => void
   onSaveTemplate: () => void
   onReplaceImage: () => void
-  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
   sheetName: string
   onBack: () => void
-}
-
-const SAVE_STATUS_LABELS: Record<CanvasToolbarProps['saveStatus'], string> = {
-  idle: 'Idle',
-  saving: 'Saving…',
-  saved: 'Saved',
-  error: 'Error',
 }
 
 export function CanvasToolbar({
@@ -32,13 +23,11 @@ export function CanvasToolbar({
   canRedo,
   canSaveTemplate,
   canvasMode,
-  imageUploadStatus,
   onUndo,
   onRedo,
   onExport,
   onSaveTemplate,
   onReplaceImage,
-  saveStatus,
   sheetName,
   onBack,
 }: CanvasToolbarProps) {
@@ -136,15 +125,10 @@ export function CanvasToolbar({
         {canvasMode === 'image' && (
           <button
             type="button"
-            className={`toolbar-btn${imageUploadStatus === 'error' ? ' toolbar-btn--error' : ''}`}
+            className="toolbar-btn"
             onClick={onReplaceImage}
-            disabled={imageUploadStatus === 'uploading'}
             aria-label="Replace image"
-            title={
-              imageUploadStatus === 'uploading' ? 'Uploading…' :
-              imageUploadStatus === 'error' ? 'Upload failed — click to retry' :
-              'Replace image'
-            }
+            title="Replace image"
           >
             🖼
           </button>
@@ -200,10 +184,6 @@ export function CanvasToolbar({
         >
           ↷
         </button>
-
-        <div className={`toolbar-save-status toolbar-save-status--${saveStatus}`}>
-          {SAVE_STATUS_LABELS[saveStatus]}
-        </div>
       </div>
     </div>
   )
