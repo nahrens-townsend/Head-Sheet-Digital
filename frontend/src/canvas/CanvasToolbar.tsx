@@ -9,6 +9,7 @@ interface CanvasToolbarProps {
   canRedo: boolean
   canSaveTemplate: boolean
   canvasMode: CanvasMode
+  saveStatus?: 'idle' | 'saving' | 'saved' | 'error'
   onUndo: () => void
   onRedo: () => void
   onExport: () => void
@@ -23,6 +24,7 @@ export function CanvasToolbar({
   canRedo,
   canSaveTemplate,
   canvasMode,
+  saveStatus,
   onUndo,
   onRedo,
   onExport,
@@ -45,6 +47,11 @@ export function CanvasToolbar({
       <div className="canvas-toolbar__title" title={sheetName}>
         {sheetName}
       </div>
+      {saveStatus && saveStatus !== 'idle' && (
+        <span className={`toolbar-save-status toolbar-save-status--${saveStatus}`}>
+          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : 'Save error'}
+        </span>
+      )}
 
       <div className="canvas-toolbar__right">
         <button
