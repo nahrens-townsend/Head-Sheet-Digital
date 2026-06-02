@@ -1,13 +1,18 @@
-import type { StrokeSize } from '../../canvas/utils/canvasUtils'
+import type { StrokeSize } from '../../canvas/utils/canvasUtils';
 
-const DOT_SIZES: Record<StrokeSize, number> = { sm: 4, md: 7, lg: 11, xl: 15 }
-const SIZE_LABELS: Record<StrokeSize, string> = { sm: 'Small', md: 'Medium', lg: 'Large', xl: 'Extra large' }
+const DOT_SIZES: Record<StrokeSize, number> = { sm: 7, md: 11, lg: 16, xl: 20 };
+const SIZE_LABELS: Record<StrokeSize, string> = {
+  sm: 'Small',
+  md: 'Medium',
+  lg: 'Large',
+  xl: 'Extra large',
+};
 
-const SIZES: StrokeSize[] = ['sm', 'md', 'lg', 'xl']
+const SIZES: StrokeSize[] = ['sm', 'md', 'lg', 'xl'];
 
 interface StrokeSizePickerProps {
-  value: StrokeSize
-  onChange: (size: StrokeSize) => void
+  value: StrokeSize;
+  onChange: (size: StrokeSize) => void;
 }
 
 export function StrokeSizePicker({ value, onChange }: StrokeSizePickerProps) {
@@ -36,5 +41,5 @@ export function StrokeSizePicker({ value, onChange }: StrokeSizePickerProps) {
         </button>
       ))}
     </div>
-  )
+  );
 }

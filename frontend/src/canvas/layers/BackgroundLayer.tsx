@@ -21,7 +21,7 @@ interface BackgroundLayerProps {
 export function BackgroundLayer({ layouts }: BackgroundLayerProps) {
   const outerX = -OUTER_EXTENT;
   const outerY = -OUTER_EXTENT;
-  const outerW = WORLD_SIZE.width  + 2 * OUTER_EXTENT;
+  const outerW = WORLD_SIZE.width + 2 * OUTER_EXTENT;
   const outerH = WORLD_SIZE.height + 2 * OUTER_EXTENT;
 
   return (
@@ -56,8 +56,10 @@ export function BackgroundLayer({ layouts }: BackgroundLayerProps) {
 
       {/* Page shadow — subtle depth cue separating page from infinite area */}
       <Rect
-        x={4} y={4}
-        width={WORLD_SIZE.width} height={WORLD_SIZE.height}
+        x={4}
+        y={4}
+        width={WORLD_SIZE.width}
+        height={WORLD_SIZE.height}
         fill="rgba(0,0,0,0.12)"
       />
 

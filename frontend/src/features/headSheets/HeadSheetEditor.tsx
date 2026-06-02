@@ -29,8 +29,6 @@ export function HeadSheetEditor() {
   const { id } = useParams<{ id: string }>();
 
   const { data: sheet, isLoading, isError } = useHeadSheet(id);
-  console.log('isLoading', isLoading);
-  console.log('sheet', sheet);
 
   const canvasRef = useRef<HeadSheetCanvasHandle | null>(null);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
@@ -302,20 +300,6 @@ export function HeadSheetEditor() {
 
   return (
     <div className="editor">
-      <CanvasToolbar
-        canUndo={canUndo}
-        canRedo={canRedo}
-        canSaveTemplate={objects.length > 0}
-        canvasMode={sheet.canvasMode}
-        saveStatus={saveStatus}
-        onUndo={undo}
-        onRedo={redo}
-        onExport={handleExport}
-        onSaveTemplate={() => setShowSaveTemplate(true)}
-        onReplaceImage={() => undefined}
-        sheetName={sheet.name}
-        onBack={() => navigate('/sheets')}
-      />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
           ref={canvasRef}
@@ -335,6 +319,20 @@ export function HeadSheetEditor() {
           onDuplicateObject={addObject}
         />
       </div>
+      <CanvasToolbar
+        canUndo={canUndo}
+        canRedo={canRedo}
+        canSaveTemplate={objects.length > 0}
+        canvasMode={sheet.canvasMode}
+        saveStatus={saveStatus}
+        onUndo={undo}
+        onRedo={redo}
+        onExport={handleExport}
+        onSaveTemplate={() => setShowSaveTemplate(true)}
+        onReplaceImage={() => undefined}
+        sheetName={sheet.name}
+        onBack={() => navigate('/sheets')}
+      />
       {showSaveTemplate && (
         <SaveTemplateModal
           defaultName={`${sheet.name} Template`}

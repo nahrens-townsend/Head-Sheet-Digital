@@ -19,10 +19,16 @@ export function ImageCanvasLayer({ dataUrl }: ImageCanvasLayerProps) {
     let mounted = true;
     const currentUrl = dataUrl;
     const img = new window.Image();
-    img.onload = () => { if (mounted) setLoaded({ url: currentUrl, image: img }); };
-    img.onerror = () => { if (mounted) setLoaded((prev) => (prev?.url === currentUrl ? null : prev)); };
+    img.onload = () => {
+      if (mounted) setLoaded({ url: currentUrl, image: img });
+    };
+    img.onerror = () => {
+      if (mounted) setLoaded((prev) => (prev?.url === currentUrl ? null : prev));
+    };
     img.src = dataUrl;
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [dataUrl]);
 
   const effectiveImage = loaded?.url === dataUrl ? loaded.image : null;

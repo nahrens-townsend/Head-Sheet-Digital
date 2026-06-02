@@ -70,12 +70,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
   );
 
   return (
-    <div
-      ref={containerRef}
-      className="color-picker"
-      style={{ position: 'relative', display: 'inline-block' }}
-      onKeyDown={handleKeyDown}
-    >
+    <div ref={containerRef} className="color-picker" onKeyDown={handleKeyDown}>
       {/* Trigger */}
       <button
         type="button"
@@ -91,8 +86,8 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
           setOpen((o) => !o);
         }}
         style={{
-          width: 26,
-          height: 26,
+          width: 34,
+          height: 34,
           borderRadius: '50%',
           border: '1px solid rgba(255,255,255,.80)',
           backgroundColor: value,
@@ -131,9 +126,9 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
           aria-label="Color palette"
           style={{
             position: 'absolute',
-            top: '100%',
+            bottom: '100%',
             left: 0,
-            marginTop: 6,
+            marginBottom: 28,
             zIndex: 50,
             background: 'var(--bg)',
             border: '1px solid var(--border)',
@@ -142,7 +137,7 @@ export function ColorPicker({ value, onChange }: ColorPickerProps) {
             padding: 8,
             display: 'grid',
             gridTemplateColumns: `repeat(${COLS}, 22px)`,
-            gap: 4,
+            gap: 8,
           }}
         >
           {PALETTE.map((color, i) => {

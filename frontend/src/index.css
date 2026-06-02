@@ -1,12 +1,12 @@
 :root {
-  --text: #6b6375;
+  --text: #000;
   --text-h: #08060d;
   --bg: #fff;
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  --accent: #000;
+  --accent-bg: rgba(26, 26, 26, 0.1);
+  --accent-border: rgba(26, 26, 26, 0.3);
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
@@ -563,9 +563,10 @@ code {
   align-items: center;
   gap: 4px;
   padding: 0 16px;
-  height: 58px;
+  height: 80px;
   background: var(--bg);
   border-bottom: none;
+  border-top: 1px solid var(--border);
   box-shadow:
     0 1px 0 var(--border),
     0 2px 8px rgba(0, 0, 0, 0.04);
@@ -593,8 +594,10 @@ code {
 .canvas-toolbar__right {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  gap: 20px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
 }
 
 .toolbar-sep {
@@ -608,13 +611,13 @@ code {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 50px;
+  height: 50px;
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 24px;
   color: var(--text);
   transition:
     background 0.12s,
@@ -790,7 +793,7 @@ code {
 }
 .drawing-tool-panel {
   position: absolute;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 20px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -1051,6 +1054,13 @@ code {
 }
 
 /* ── Note colour picker (selection panel) ───────────────────── */
+
+.color-picker {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  position: relative;
+}
 
 .note-color-picker {
   display: flex;
