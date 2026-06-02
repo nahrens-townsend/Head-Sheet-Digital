@@ -11,3 +11,18 @@ export interface HeadSheetSummary {
   thumbnailUrl: string | null
   updatedAt: string
 }
+
+// HeadSheet is the full response from GET /head-sheets/:id (matches HeadSheetResponseDto).
+export interface HeadSheet {
+  id: string
+  name: string
+  clientName: string | null
+  templateType: TemplateType
+  templateTypes: TemplateType[]
+  canvasMode: CanvasMode
+  imageDataUrl: string | null
+  strokesJson: string
+  thumbnailUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
