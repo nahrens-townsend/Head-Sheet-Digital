@@ -12,15 +12,15 @@ import type { CanvasObject } from '../../types/canvasObject';
 import { SaveTemplateModal } from './SaveTemplateModal';
 import { useCreateTemplate, useHeadSheet, useSaveStrokes, useSaveThumbnail } from './useHeadSheets';
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 function parseStrokesJson(strokesJson: string | null | undefined): CanvasObject[] {
-  if (!strokesJson) return []
+  if (!strokesJson) return [];
   try {
-    const parsed = JSON.parse(strokesJson) as { version?: number; objects?: CanvasObject[] }
-    return parsed.objects ?? []
+    const parsed = JSON.parse(strokesJson) as { version?: number; objects?: CanvasObject[] };
+    return parsed.objects ?? [];
   } catch {
-    return []
+    return [];
   }
 }
 
@@ -29,6 +29,8 @@ export function HeadSheetEditor() {
   const { id } = useParams<{ id: string }>();
 
   const { data: sheet, isLoading, isError } = useHeadSheet(id);
+  console.log('isLoading', isLoading);
+  console.log('sheet', sheet);
 
   const canvasRef = useRef<HeadSheetCanvasHandle | null>(null);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
@@ -71,11 +73,17 @@ export function HeadSheetEditor() {
 
   // Wrap history mutations to mark the canvas as dirty before delegating.
   const addObject = useCallback(
-    (obj: CanvasObject) => { hasUserEditedRef.current = true; _addObject(obj) },
+    (obj: CanvasObject) => {
+      hasUserEditedRef.current = true;
+      _addObject(obj);
+    },
     [_addObject],
   );
   const addObjects = useCallback(
-    (objs: CanvasObject[]) => { hasUserEditedRef.current = true; _addObjects(objs) },
+    (objs: CanvasObject[]) => {
+      hasUserEditedRef.current = true;
+      _addObjects(objs);
+    },
     [_addObjects],
   );
   const wrappedUpdateObject = useCallback(
@@ -86,23 +94,33 @@ export function HeadSheetEditor() {
     [_wrappedUpdateObject],
   );
   const wrappedDeleteObjects = useCallback(
-    (ids: string[]) => { hasUserEditedRef.current = true; _wrappedDeleteObjects(ids) },
+    (ids: string[]) => {
+      hasUserEditedRef.current = true;
+      _wrappedDeleteObjects(ids);
+    },
     [_wrappedDeleteObjects],
   );
   // Undo/redo can also produce unsaved state — mark dirty so they get auto-saved.
-  const undo = useCallback(() => { hasUserEditedRef.current = true; _undo() }, [_undo]);
-  const redo = useCallback(() => { hasUserEditedRef.current = true; _redo() }, [_redo]);
+  const undo = useCallback(() => {
+    hasUserEditedRef.current = true;
+    _undo();
+  }, [_undo]);
+  const redo = useCallback(() => {
+    hasUserEditedRef.current = true;
+    _redo();
+  }, [_redo]);
 
   // Initialize canvas objects once when the sheet identity changes.
   // sheet?.id (not full `sheet`) is intentional: we don't want background refetches
   // to clobber in-progress edits once the editor is authoritative.
   useEffect(() => {
     if (!sheet) return;
+    if (hasUserEditedRef.current) return;
+
     hasUserEditedRef.current = false;
     setSelectedObjectIds([]);
     setObjects(parseStrokesJson(sheet.strokesJson));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheet?.id]);
+  }, [sheet?.strokesJson]);
 
   // Always-fresh callback ref — assigned in an effect (not during render) so the
   // react-hooks/refs rule is satisfied while still capturing the latest closure.
@@ -145,10 +163,10 @@ export function HeadSheetEditor() {
     };
   });
 
-  // Debounced auto-save: fires 2500ms after the last object change.
+  // Debounced auto-save: fires 1500ms after the last object change.
   useEffect(() => {
     if (!hasUserEditedRef.current) return;
-    const timer = setTimeout(() => void saveSheetRef.current(), 2500);
+    const timer = setTimeout(() => void saveSheetRef.current(), 500);
     return () => clearTimeout(timer);
   }, [objects]);
 

@@ -22,7 +22,14 @@ import { useTextTool } from './tools/useTextTool';
 import { useSelectTool } from './tools/useSelectTool';
 import { useSnapping } from './utils/snapping';
 import { resolveGuidePoints } from './utils/guidePoints';
-import { STROKE_SIZES, WORLD_SIZE, createStrokeId, type StagePointerHandler, type StageSize, type Point } from './utils/canvasUtils';
+import {
+  STROKE_SIZES,
+  WORLD_SIZE,
+  createStrokeId,
+  type StagePointerHandler,
+  type StageSize,
+  type Point,
+} from './utils/canvasUtils';
 import { BackgroundLayer } from './layers/BackgroundLayer';
 import { ImageCanvasLayer } from './layers/ImageCanvasLayer';
 import { GuideLayer } from './layers/GuideLayer';
@@ -41,7 +48,7 @@ const PAN_LIMIT_FACTOR = 2;
 
 /** Clamp panOffset so the world canvas stays within 2× its own size of the viewport. */
 function clampPanOffset(offset: Point, fitScaleVal: number, zoomVal: number): Point {
-  const maxX = WORLD_SIZE.width  * fitScaleVal * zoomVal * PAN_LIMIT_FACTOR;
+  const maxX = WORLD_SIZE.width * fitScaleVal * zoomVal * PAN_LIMIT_FACTOR;
   const maxY = WORLD_SIZE.height * fitScaleVal * zoomVal * PAN_LIMIT_FACTOR;
   return {
     x: Math.max(-maxX, Math.min(maxX, offset.x)),
@@ -138,7 +145,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     );
     const fitOffset = useMemo<Point>(
       () => ({
-        x: (stageSize.width  - WORLD_SIZE.width  * fitScale) / 2,
+        x: (stageSize.width - WORLD_SIZE.width * fitScale) / 2,
         y: (stageSize.height - WORLD_SIZE.height * fitScale) / 2,
       }),
       [stageSize, fitScale],
@@ -288,14 +295,16 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
         if (isPanning) {
-          setPanOffset(clampPanOffset(
-            {
-              x: panOffsetAtStart.x + (e.clientX - panStart.x),
-              y: panOffsetAtStart.y + (e.clientY - panStart.y),
-            },
-            fitScaleRef.current,
-            zoomRef.current,
-          ));
+          setPanOffset(
+            clampPanOffset(
+              {
+                x: panOffsetAtStart.x + (e.clientX - panStart.x),
+                y: panOffsetAtStart.y + (e.clientY - panStart.y),
+              },
+              fitScaleRef.current,
+              zoomRef.current,
+            ),
+          );
           e.stopPropagation();
           return;
         }
@@ -318,14 +327,24 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             y: (pivotCanvas.y - fo.y - panOffsetRef.current.y) / (fs * zoomRef.current),
           };
           setZoom(clamped);
-          setPanOffset(clampPanOffset(
-            {
-              x: pivotCanvas.x - fo.x - contentAnchor.x * fs * clamped + (center.x - lastPinchCenter.x),
-              y: pivotCanvas.y - fo.y - contentAnchor.y * fs * clamped + (center.y - lastPinchCenter.y),
-            },
-            fs,
-            clamped,
-          ));
+          setPanOffset(
+            clampPanOffset(
+              {
+                x:
+                  pivotCanvas.x -
+                  fo.x -
+                  contentAnchor.x * fs * clamped +
+                  (center.x - lastPinchCenter.x),
+                y:
+                  pivotCanvas.y -
+                  fo.y -
+                  contentAnchor.y * fs * clamped +
+                  (center.y - lastPinchCenter.y),
+              },
+              fs,
+              clamped,
+            ),
+          );
 
           lastPinchDist = dist;
           lastPinchCenter = center;
@@ -394,9 +413,7 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     // Compute layout rects for all templates in the current stage.
     const layouts = useMemo(
       () =>
-        canvasMode === 'templates'
-          ? computeTemplateLayouts(templateTypes, templateImages)
-          : [],
+        canvasMode === 'templates' ? computeTemplateLayouts(templateTypes, templateImages) : [],
       [canvasMode, templateTypes, templateImages],
     );
 
@@ -468,7 +485,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       [exportStage],
     );
 
-
     /**
      * Intercepts object completion for pen/line/arrow/dotted tools.
      * When symmetry is enabled it creates a mirrored twin and emits both as
@@ -507,7 +523,6 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
       clearSnap,
     };
 
-
     const lineTool = useLineTool(commonVectorOpts);
     const arrowTool = useArrowLineTool(commonVectorOpts);
     const dottedTool = useDottedLineTool(commonVectorOpts);
@@ -537,18 +552,32 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
           return textTool;
         case 'pencil':
           switch (activeDrawingTool) {
-            case 'line':   return lineTool;
-            case 'arrow':  return arrowTool;
-            case 'dotted': return dottedTool;
-            case 'eraser': return eraserTool;
-            default:       return lineTool;
+            case 'line':
+              return lineTool;
+            case 'arrow':
+              return arrowTool;
+            case 'dotted':
+              return dottedTool;
+            case 'eraser':
+              return eraserTool;
+            default:
+              return lineTool;
           }
         case 'hand':
           return selectTool; // hand uses native pan; Stage handlers receive no meaningful events
         default:
           return lineTool;
       }
-    }, [activeDrawingTool, arrowTool, dottedTool, eraserTool, lineTool, textTool, selectTool, tool]);
+    }, [
+      activeDrawingTool,
+      arrowTool,
+      dottedTool,
+      eraserTool,
+      lineTool,
+      textTool,
+      selectTool,
+      tool,
+    ]);
 
     const activePreviewPoints =
       tool === 'pencil'
@@ -571,7 +600,10 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
     }, [symmetryEnabled, activePreviewPoints, layouts]);
 
     return (
-      <div ref={containerRef} className={`head-sheet-canvas head-sheet-canvas--tool-${tool === 'pencil' ? activeDrawingTool : tool}`}>
+      <div
+        ref={containerRef}
+        className={`head-sheet-canvas head-sheet-canvas--tool-${tool === 'pencil' ? activeDrawingTool : tool}`}
+      >
         <Stage
           ref={stageRef}
           width={stageSize.width}
@@ -621,15 +653,13 @@ export const HeadSheetCanvas = forwardRef<HeadSheetCanvasHandle, HeadSheetCanvas
             clearSnap={clearSnap}
             isExporting={isExporting}
             onDraftStart={(id, mirrorId) => {
-              const ids = new Set([id])
-              if (mirrorId) ids.add(mirrorId)
-              setEditingObjectIds(ids)
+              const ids = new Set([id]);
+              if (mirrorId) ids.add(mirrorId);
+              setEditingObjectIds(ids);
             }}
             onDraftEnd={() => setEditingObjectIds(new Set())}
           />
-          {isExporting && (
-            <TextAnnotationsExportLayer objects={objects} />
-          )}
+          {isExporting && <TextAnnotationsExportLayer objects={objects} />}
         </Stage>
         <TextAnnotationsOverlay
           objects={objects}
