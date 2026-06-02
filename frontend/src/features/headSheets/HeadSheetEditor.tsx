@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { CanvasToolbar } from '../../canvas/CanvasToolbar';
 import { HeadSheetCanvas } from '../../canvas/HeadSheetCanvas';
 import { SelectionPanel } from '../../canvas/SelectionPanel';
@@ -8,40 +8,167 @@ import { useMirroredObjects } from '../../canvas/useMirroredObjects';
 import { useCanvasStore } from '../../stores/canvasStore';
 import { duplicateObject } from '../../canvas/utils/objectUtils';
 import type { HeadSheetCanvasHandle } from '../../canvas/HeadSheetCanvas';
+import type { CanvasObject } from '../../types/canvasObject';
 import { SaveTemplateModal } from './SaveTemplateModal';
-import { useCreateTemplate } from './useHeadSheets';
-import type { CanvasMode, TemplateType } from '../../types/headSheet';
+import { useCreateTemplate, useHeadSheet, useSaveStrokes, useSaveThumbnail } from './useHeadSheets';
 
-const SHEET_NAME = 'Head Sheet';
-const TEMPLATE_TYPES: TemplateType[] = ['front'];
-const CANVAS_MODE: CanvasMode = 'templates';
-const IMAGE_DATA_URL: string | null = null;
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+function parseStrokesJson(strokesJson: string | null | undefined): CanvasObject[] {
+  if (!strokesJson) return [];
+  try {
+    const parsed = JSON.parse(strokesJson) as { version?: number; objects?: CanvasObject[] };
+    return parsed.objects ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export function HeadSheetEditor() {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+
+  const { data: sheet, isLoading, isError } = useHeadSheet(id);
+  console.log('isLoading', isLoading);
+  console.log('sheet', sheet);
+
   const canvasRef = useRef<HeadSheetCanvasHandle | null>(null);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+
   const {
-    addObject,
-    addObjects,
+    addObject: _addObject,
+    addObjects: _addObjects,
     updateObject,
     updateObjectsBatch,
     deleteObjects: rawDeleteObjects,
-    undo,
-    redo,
+    undo: _undo,
+    redo: _redo,
     canUndo,
     canRedo,
     objects,
+    setObjects,
   } = useCanvasHistory();
   const { selectedObjectIds, setSelectedObjectIds, setZoom, setPanOffset } = useCanvasStore();
 
-  const { wrappedUpdateObject, wrappedDeleteObjects } = useMirroredObjects({
-    objects,
-    updateObject,
-    updateObjectsBatch,
-    deleteObjects: rawDeleteObjects,
-  });
+  const { wrappedUpdateObject: _wrappedUpdateObject, wrappedDeleteObjects: _wrappedDeleteObjects } =
+    useMirroredObjects({
+      objects,
+      updateObject,
+      updateObjectsBatch,
+      deleteObjects: rawDeleteObjects,
+    });
+
   const createTemplateMutation = useCreateTemplate();
+  const saveStrokesMutation = useSaveStrokes();
+  const saveThumbnailMutation = useSaveThumbnail();
+
+  // Guards auto-save from firing on initial hydration; set by any user mutation.
+  const hasUserEditedRef = useRef(false);
+  // Stable ref for sheet id — avoids stale closures in the auto-save callback.
+  const sheetIdRef = useRef<string | undefined>(id);
+  useEffect(() => {
+    sheetIdRef.current = sheet?.id ?? id;
+  }, [sheet?.id, id]);
+
+  // Wrap history mutations to mark the canvas as dirty before delegating.
+  const addObject = useCallback(
+    (obj: CanvasObject) => {
+      hasUserEditedRef.current = true;
+      _addObject(obj);
+    },
+    [_addObject],
+  );
+  const addObjects = useCallback(
+    (objs: CanvasObject[]) => {
+      hasUserEditedRef.current = true;
+      _addObjects(objs);
+    },
+    [_addObjects],
+  );
+  const wrappedUpdateObject = useCallback(
+    (objId: string, updater: (obj: CanvasObject) => CanvasObject) => {
+      hasUserEditedRef.current = true;
+      _wrappedUpdateObject(objId, updater);
+    },
+    [_wrappedUpdateObject],
+  );
+  const wrappedDeleteObjects = useCallback(
+    (ids: string[]) => {
+      hasUserEditedRef.current = true;
+      _wrappedDeleteObjects(ids);
+    },
+    [_wrappedDeleteObjects],
+  );
+  // Undo/redo can also produce unsaved state — mark dirty so they get auto-saved.
+  const undo = useCallback(() => {
+    hasUserEditedRef.current = true;
+    _undo();
+  }, [_undo]);
+  const redo = useCallback(() => {
+    hasUserEditedRef.current = true;
+    _redo();
+  }, [_redo]);
+
+  // Initialize canvas objects once when the sheet identity changes.
+  // sheet?.id (not full `sheet`) is intentional: we don't want background refetches
+  // to clobber in-progress edits once the editor is authoritative.
+  useEffect(() => {
+    if (!sheet) return;
+    if (hasUserEditedRef.current) return;
+
+    hasUserEditedRef.current = false;
+    setSelectedObjectIds([]);
+    setObjects(parseStrokesJson(sheet.strokesJson));
+  }, [sheet?.strokesJson]);
+
+  // Always-fresh callback ref — assigned in an effect (not during render) so the
+  // react-hooks/refs rule is satisfied while still capturing the latest closure.
+  const saveSheetRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    saveSheetRef.current = async () => {
+      const currentId = sheetIdRef.current;
+      if (!currentId) return;
+      // Serialize: if a save is already in flight, defer to avoid out-of-order writes.
+      if (saveStrokesMutation.isPending) {
+        setTimeout(() => void saveSheetRef.current(), 500);
+        return;
+      }
+      setSaveStatus('saving');
+      try {
+        const updated = await saveStrokesMutation.mutateAsync({
+          id: currentId,
+          strokesJson: JSON.stringify({ version: 5, objects }),
+        });
+        // Strokes are authoritative — report saved regardless of thumbnail outcome.
+        setSaveStatus('saved');
+        // Fire-and-forget thumbnail (non-critical; failure silently ignored).
+        void (async () => {
+          try {
+            const thumbnailDataUrl = await canvasRef.current?.getThumbnailDataUrl();
+            if (thumbnailDataUrl) {
+              await saveThumbnailMutation.mutateAsync({
+                id: currentId,
+                thumbnailDataUrl,
+                expectedUpdatedAt: updated.updatedAt,
+              });
+            }
+          } catch {
+            // Thumbnail conflicts are cosmetic; next auto-save will retry.
+          }
+        })();
+      } catch {
+        setSaveStatus('error');
+      }
+    };
+  });
+
+  // Debounced auto-save: fires 1500ms after the last object change.
+  useEffect(() => {
+    if (!hasUserEditedRef.current) return;
+    const timer = setTimeout(() => void saveSheetRef.current(), 500);
+    return () => clearTimeout(timer);
+  }, [objects]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -91,8 +218,8 @@ export function HeadSheetEditor() {
       if (key === 'd' && !event.ctrlKey && !event.metaKey && selectedObjectIds.length > 0) {
         event.preventDefault();
         const newIds: string[] = [];
-        for (const id of selectedObjectIds) {
-          const obj = objects.find((o) => o.id === id);
+        for (const sid of selectedObjectIds) {
+          const obj = objects.find((o) => o.id === sid);
           if (obj) {
             const dup = duplicateObject(obj);
             addObject(dup);
@@ -124,7 +251,8 @@ export function HeadSheetEditor() {
       if (!dataUrl) return;
 
       const filename = `${
-        SHEET_NAME.trim()
+        (sheet?.name ?? 'head-sheet')
+          .trim()
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-') || 'head-sheet'
       }.png`;
@@ -145,7 +273,7 @@ export function HeadSheetEditor() {
       const thumbnailDataUrl = await canvasRef.current?.getThumbnailDataUrl();
       await createTemplateMutation.mutateAsync({
         name,
-        templateType: TEMPLATE_TYPES[0] ?? 'front',
+        templateType: sheet?.templateType ?? 'front',
         canvasData: { version: 5, objects },
         thumbnailDataUrl: thumbnailDataUrl ?? undefined,
       });
@@ -155,28 +283,46 @@ export function HeadSheetEditor() {
     }
   }
 
+  if (isLoading) {
+    return <div className="editor-loading">Loading…</div>;
+  }
+
+  if (isError || !sheet) {
+    return (
+      <div className="editor-error">
+        <div>
+          <p>Failed to load head sheet.</p>
+          <button type="button" className="btn btn--ghost" onClick={() => navigate('/sheets')}>
+            ← Back to Sheets
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="editor">
       <CanvasToolbar
         canUndo={canUndo}
         canRedo={canRedo}
         canSaveTemplate={objects.length > 0}
-        canvasMode={CANVAS_MODE}
+        canvasMode={sheet.canvasMode}
+        saveStatus={saveStatus}
         onUndo={undo}
         onRedo={redo}
         onExport={handleExport}
         onSaveTemplate={() => setShowSaveTemplate(true)}
         onReplaceImage={() => undefined}
-        sheetName={SHEET_NAME}
+        sheetName={sheet.name}
         onBack={() => navigate('/sheets')}
       />
       <div className="editor__canvas-wrap">
         <HeadSheetCanvas
           ref={canvasRef}
           objects={objects}
-          templateTypes={TEMPLATE_TYPES}
-          canvasMode={CANVAS_MODE}
-          imageDataUrl={IMAGE_DATA_URL}
+          templateTypes={sheet.templateTypes}
+          canvasMode={sheet.canvasMode}
+          imageDataUrl={sheet.imageDataUrl}
           onObjectComplete={addObject}
           onObjectsComplete={addObjects}
           onUpdateObject={wrappedUpdateObject}
@@ -191,7 +337,7 @@ export function HeadSheetEditor() {
       </div>
       {showSaveTemplate && (
         <SaveTemplateModal
-          defaultName={`${SHEET_NAME} Template`}
+          defaultName={`${sheet.name} Template`}
           errorMessage={
             createTemplateMutation.isError ? 'Failed to save template. Please try again.' : null
           }
